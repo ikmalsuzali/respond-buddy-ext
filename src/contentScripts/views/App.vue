@@ -20,6 +20,7 @@ const isLoading = ref(false);
 const messageInput = ref(null);
 const popover = ref(null);
 const fbaButton = ref(null);
+const credits = ref(0);
 
 const formattedText = (text: string) => {
   if (text?.includes("\n") || text?.includes("```")) {
@@ -129,17 +130,12 @@ let toolbarItems = ref([
 ]);
 
 const onClickToolbarItem = async (index: any) => {
-  console.log("tool bar items", toolbarItems.value[index].key);
-  console.log("tool bar items", toolbarItems.value[index].isDropdownOpen);
-
   if (
     toolbarItems.value[index]?.isDropdownOpen === false ||
     toolbarItems.value[index]?.isDropdownOpen === true
   ) {
     toolbarItems.value[index].isDropdownOpen =
       !toolbarItems.value[index]?.isDropdownOpen;
-
-    console.log(toolbarItems.value[index]?.isDropdownOpen);
 
     return;
   }
@@ -154,8 +150,6 @@ const onClickToolbarItem = async (index: any) => {
     return;
   }
 
-  console.log("tool bar items", toolbarItems.value[index]?.template);
-
   // If the toolbar item has template, send a message to the background script
   await sendMessage("ask-chat", {
     message: `${toolbarItems.value[index]?.template}${selectedText.value}}`,
@@ -163,13 +157,10 @@ const onClickToolbarItem = async (index: any) => {
 };
 
 const onMouseEnterToolbarItem = (index: any) => {
-  console.log("tool bar items", toolbarItems.value[index].key);
   toolbarItems.value[index].isHovered = true;
 };
 
 const onMouseLeaveToolbarItem = (index: any) => {
-  console.log("tool bar items", toolbarItems.value[index].key);
-
   toolbarItems.value[index].isHovered = false;
 };
 
@@ -256,15 +247,13 @@ const shareToSocialMedia = (platform: string, content?: any = {}) => {
 };
 
 onMessage("app-message", (message) => {
-  console.log("🚀 ~ file: App.vue:25 ~ onMessage ~ message:", message);
   toggle(true);
   messageData.value.push(message.data?.appMessages);
   isLoading.value = !isLoading.value;
-  console.log("🚀 ~ file: App.vue:115 ~ onMessage ~ isLoading:", isLoading);
-  console.log(
-    "🚀 ~ file: App.vue:109 ~ onMessage ~ messageData:",
-    messageData.value
-  );
+});
+
+onMessage("toggle-chat", (message) => {
+  toggle(message.data?.toggle);
 });
 
 const onSendClick = async () => {
@@ -273,14 +262,13 @@ const onSendClick = async () => {
     return;
   }
 
-  console.log("🚀 ~ file: App.vue:131 ~ onSendClick ~ onSendClick:", message);
-
-  const res = await sendMessage("ask-chat", {
-    message,
-  });
-
-  console.log(res);
-
+  await sendMessage(
+    "ask-chat",
+    {
+      message,
+    },
+    "background"
+  );
   questionInput.value = "";
 
   adjustHeight();
@@ -314,7 +302,6 @@ watchEffect(() => {
 const scrollToBottomInChatLog = () => {};
 
 const dragStart = (e) => {
-  console.log("dragStart", e);
   startX = e.clientX;
   startY = e.clientY;
   document.addEventListener("mousemove", dragMove);
@@ -330,10 +317,7 @@ const dragMove = (e) => {
 
 const showIconOnSelection = () => {
   const selectedText = window.getSelection().toString().trim();
-  console.log(
-    "🚀 ~ file: index.ts:23 ~ showIconOnSelection ~ selectedText:",
-    selectedText
-  );
+
   if (selectedText.length > 0) {
     browser.runtime.sendMessage({ type: "highlight", text: selectedText });
   }
@@ -346,30 +330,15 @@ const dragEnd = () => {
 
 const copyMessage = (message, index) => {
   isCopiedTriggered.value = index;
-  console.log(
-    "🚀 ~ file: App.vue:46 ~ copyMessage ~ isCopiedTriggered:",
-    isCopiedTriggered.value
-  );
-  console.log("🚀 ~ file: App.vue:44 ~ copyMessage ~ message:", message);
-  navigator.clipboard
-    .writeText(message)
-    .then(() => {
-      console.log("Message copied to clipboard");
-    })
-    .catch((err) => {
-      console.error("Failed to copy message: ", err);
-    });
+
+  navigator.clipboard.writeText(message);
+
   setTimeout(() => {
     isCopiedTriggered.value = -1;
   }, 200);
 };
 
 const onClickToolbarOption = async (message: string) => {
-  console.log(
-    "🚀 ~ file: App.vue:350 ~ onClickToolbarOption ~ message:",
-    message
-  );
-
   toggle(true);
 
   await sendMessage("ask-chat", {
@@ -380,7 +349,6 @@ const onClickToolbarOption = async (message: string) => {
 const showToolbar = () => {
   if (show.value) return;
   const selection = window.getSelection();
-  console.log("🚀 ~ file: App.vue:231 ~ showToolbar ~ selection:", selection);
   selectedText.value = selection?.toString().trim();
   if (selectedText.value.length > 0) {
     const range = selection?.getRangeAt(0).cloneRange();
@@ -545,9 +513,7 @@ onBeforeUnmount(() => {
               Login / Register
             </button>
           </div>
-          <div class="text-xs">
-            Please share it with your friends! 🙏 (Extra limits if you do)
-          </div>
+          <div class="text-xs">Please share it with your friends! 🙏</div>
           <div class="flex gap-1 border-none">
             <button
               v-for="social in socialMediaContents"
@@ -613,12 +579,29 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <button
-        class="flex w-10 h-10 rounded-full shadow cursor-pointer border-none"
+        class="flex rounded-full cursor-pointer border-none bg-transparent"
         ref="fbaButton"
         @mousedown.prevent="dragStart"
         @click.stop="toggle()"
       >
-        <pixelarticons-power class="block m-auto text-white text-lg" />
+        <div
+          v-if="!show"
+          class="absolute shadow-xl top-0 right-0 bg-red-500 rounded-full text-white h-5 w-5 flex items-center justify-center"
+          style="
+            font-size: 10px;
+            font-weight: 600;
+            line-height: 1;
+            margin-top: -1px;
+            margin-right: 1px;
+          "
+        >
+          5
+        </div>
+        <img
+          src="/assets/rb-icon.png"
+          class="text-lg"
+          style="width: 38px; padding-top: 3px"
+        />
       </button>
     </div>
   </div>

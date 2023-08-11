@@ -1,17 +1,25 @@
 /* eslint-disable no-console */
-import { onMessage } from "webext-bridge/content-script";
+import { onMessage, sendMessage } from "webext-bridge/content-script";
 import { createApp } from "vue";
 import App from "./views/App.vue";
 import { setupApp } from "~/logic/common-setup";
 
 // Firefox `browser.tabs.executeScript()` requires scripts return a primitive value
 (() => {
-  console.info("[vitesse-webext] Hello world from content script");
+  let url = "https://respond-buddy-web.vercel.app";
 
+  console.log(window.location);
+  console.log(localStorage?.getItem("accessToken"));
+  if (
+    window.location.href.includes(url) &&
+    localStorage.getItem("accessToken")
+  ) {
+    sendMessage("get-access-token", {
+      accessToken: JSON.parse(localStorage?.getItem("accessToken") || ""),
+    });
+    return localStorage?.getItem("accessToken");
+  }
   // communication example: send previous tab title from background page
-  // onMessage("tab-prev", ({ data }) => {
-  //   console.log(`[vitesse-webext] Navigate from page "${data.title}"`);
-  // });
 
   // mount component to context window
 

@@ -1,30 +1,115 @@
 <script setup lang="ts">
-import { messages, storageDemo, token, userId } from "~/logic/storage";
+import { sendMessage } from "webext-bridge/popup";
+import { token, credits, newCreditDate } from "~/logic/storage";
 
-function openOptionsPage() {
-  browser.runtime.openOptionsPage();
-}
+// const openOptionsPage = () => {
+//   browser.runtime.openOptionsPage();
+// }
 
 const redirectIfNoAuth = () => {
+  const webUrl = "https://respond-buddy-web.vercel.app/";
   if (!token.value) {
-    // browser.tabs.create({ url: "https://www.example.com/" });
+    browser.tabs.create({ url: webUrl });
   }
+};
+
+const onLoginClick = () => {
+  const webUrl = "https://respond-buddy-web.vercel.app/login";
+  browser.tabs.create({ url: webUrl });
+};
+
+const onRegisterClick = () => {
+  const webUrl = "https://respond-buddy-web.vercel.app/register";
+  browser.tabs.create({ url: webUrl });
+};
+
+const onDashboardClick = () => {
+  const webUrl = "https://respond-buddy-web.vercel.app";
+  browser.tabs.create({ url: webUrl });
+};
+
+const onChatClick = () => {
+  sendMessage("toggle-chat", { toggle: true }, "background");
 };
 
 redirectIfNoAuth();
 </script>
 
 <template>
-  <main class="w-[300px] px-4 py-5 text-center text-gray-700">
-    <Logo />
-    <div>Popup</div>
-    <SharedSubtitle />
+  <main class="w-[300px] px-4 py-5 text-gray-700 space-y-1">
+    {{ newCreditDate }}
+    <div class="flex pb-2">
+      <img
+        src="/assets/rb-icon.png"
+        class="text-slate-700 text-lg"
+        style="width: 32px; margin-top: -2px"
+      />
+      <div class="text-lg font-bold">Respond Buddy</div>
+    </div>
+    <div class="flex">
+      <button
+        v-if="token"
+        type="button"
+        class="flex-1 text-white bg-gradient-to-br from-green-400 to-blue-600 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-green-200 dark:focus:ring-green-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 mb-2"
+        @click="onDashboardClick"
+      >
+        Go to Dashboard
+      </button>
+      <button
+        v-if="!token"
+        type="button"
+        class="flex-1 text-white bg-gradient-to-br from-green-400 to-blue-600 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-green-200 dark:focus:ring-green-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 mb-2"
+        @click="onLoginClick"
+      >
+        Login
+      </button>
+      <button
+        v-if="!token"
+        type="button"
+        class="flex-1 text-white bg-gradient-to-br from-green-400 to-blue-600 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-green-200 dark:focus:ring-green-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 mb-2"
+        @click="onRegisterClick"
+      >
+        Register
+      </button>
+    </div>
+    <div class="flex">
+      <button
+        type="button"
+        class="flex flex-col w-full items-center justify-center text-white bg-[#050708] hover:bg-[#050708]/80 focus:ring-4 focus:outline-none focus:ring-[#050708]/50 font-medium rounded-lg text-xs px-5 py-2.5 dark:hover:bg-[#050708]/40 dark:focus:ring-gray-600 mr-2 mb-2"
+        @click="onChatClick"
+      >
+        <div class="flex items-center justify-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="icon icon-tabler icon-tabler-message-question mr-2"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            stroke="currentColor"
+            fill="none"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M8 9h8" />
+            <path d="M8 13h6" />
+            <path
+              d="M14 18h-1l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v4.5"
+            />
+            <path d="M19 22v.01" />
+            <path
+              d="M19 19a2.003 2.003 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"
+            />
+          </svg>
+          Start chatting now...
+        </div>
+        <div style="font-size: 10px" class="font-light mt-1">
+          {{ `😎 ${credits} credits remaining (renewed daily) 😎` }}
+        </div>
 
-    <button class="btn mt-2" @click="openOptionsPage">Open Options</button>
-    <div class="mt-2">
-      <span class="opacity-50">token:</span> {{ token }}
-      <span class="opacity-50">uuid:</span> {{ userId }}
-      <span class="opacity-50">storageDemo:</span> {{ messages }}
+        <!-- <img src="~/assets/message-question.svg" class="w-4 h-4 ml-2" /> -->
+      </button>
     </div>
   </main>
 </template>

@@ -1,7 +1,13 @@
 import { onMessage, sendMessage } from "webext-bridge/background";
 import type { Tabs } from "webextension-polyfill";
 import { generateUUID } from "~/logic/helper";
-import { messages, token, userId } from "~/logic/storage";
+import {
+  messages,
+  token,
+  userId,
+  credits,
+  newCreditDate,
+} from "~/logic/storage";
 
 // only on dev mode
 if (import.meta.hot) {
@@ -10,6 +16,8 @@ if (import.meta.hot) {
   // load latest content script
   import("./contentScriptHMR");
 }
+
+const creditResetAmount = 10;
 
 browser.runtime.onInstalled.addListener((): void => {
   // eslint-disable-next-line no-console
@@ -69,8 +77,6 @@ let previousTabId = 0;
 // see shim.d.ts for type declaration
 
 browser.tabs.onActivated.addListener(async ({ tabId }) => {
-  console.log("tabId", tabId);
-
   if (!previousTabId) {
     previousTabId = tabId;
     return;
@@ -86,7 +92,6 @@ browser.tabs.onActivated.addListener(async ({ tabId }) => {
   }
 
   // eslint-disable-next-line no-console
-  console.log("previous tab", tab);
   // sendMessage(
   //   "tab-prev",
   //   { title: tab.title },
@@ -94,12 +99,9 @@ browser.tabs.onActivated.addListener(async ({ tabId }) => {
   // );
 });
 
-browser.action.onClicked.addListener(async () => {
-  console.log("action clicked");
-});
+browser.action.onClicked.addListener(async () => {});
 
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
-  console.log({ info, tab });
   if (info.menuItemId === "summarize") {
     processMessage(`Summarize: ${info.selectionText}`, tab.id);
   } else if (info.menuItemId === "respond") {
@@ -115,30 +117,45 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
 
 onMessage("ask-chat", async (message) => {
   try {
-    console.log("🚀 ~ file: main.ts:142 ~ onMessage ~ message:", message);
-    const tab = await browser.tabs.get(previousTabId);
-    console.log("current tab", tab);
-    await processMessage(message?.data?.message, tab.id);
+    const tabs = await browser?.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    await processMessage(message?.data?.message, tabs[0].id);
   } catch (error) {}
 });
 
-onMessage("get-current-tab", async () => {
-  try {
-    const tab = await browser.tabs.get(previousTabId);
-    console.log("current tab", tab);
-    return {
-      title: tab?.title,
-    };
-  } catch {
-    return {
-      title: undefined,
-    };
-  }
+onMessage("toggle-chat", async (message) => {
+  const tabs = await browser?.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  await sendMessage("toggle-chat", message?.data, {
+    context: "content-script",
+    tabId: tabs[0].id,
+  });
 });
 
+onMessage("get-access-token", async (data) => {
+  if (!data.data.accessToken) return;
+  token.value = data.data.accessToken.trim();
+});
+
+// onMessage("get-current-tab", async () => {
+//   try {
+//     const tab = await browser.tabs.get(previousTabId);
+//     return {
+//       title: tab?.title,
+//     };
+//   } catch {
+//     return {
+//       title: undefined,
+//     };
+//   }
+// });
+
 const processMessage = async (message: string, tabId: number) => {
-  console.log("🚀 ~ file: main.ts:165 ~ processMessage ~ tabId:", tabId);
-  console.log("🚀 ~ file: main.ts:165 ~ processMessage ~ message:", message);
   const senderMessage = {
     senderId: userId.value,
     messages: [
@@ -177,31 +194,44 @@ const processMessage = async (message: string, tabId: number) => {
   );
 };
 
+// browser.tabs.query({ active: true, currentWindow: true }).then(async (tabs) => {
+//   const currentTab = tabs[0];
+
+//   // Get a value from local storage
+//   let res = await sendMessage(
+//     "get-access-token",
+//     { key: "accessToken" },
+//     { context: "content-script", tabId: currentTab.id }
+//   );
+// });
+
 const callGPTMessage = async (message: string) => {
   try {
-    console.log("🚀 ~ file: main.ts:141 ~ callGPTMessage ~ message:", message);
+    if (credits.value <= 0)
+      return "You have no credits left, please upgrade your plan.";
+
     if (message) {
-      const data = await fetch("http://0.0.0.0:8080/api/v1/message/free", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message,
-          user_id: userId.value,
-        }),
-      });
+      const data = await fetch(
+        "https://api.respondbuddy.com/api/v1/message/free",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message,
+            user_id: userId.value,
+          }),
+        }
+      );
+
+      credits.value = credits.value - 1;
 
       let response = await data.json();
-      console.log(
-        "🚀 ~ file: main.ts:221 ~ callGPTMessage ~ response:",
-        response
-      );
 
       return response?.data?.message || "";
     }
   } catch (error) {
-    console.log(error);
     return "Failed to get response, try again later.";
   }
 };
@@ -239,12 +269,23 @@ const callGPTMessage = async (message: string) => {
 //     console.error(browser.runtime.lastError || error);
 //     throw new Error(`Unable to inject script into tab ${tabId}`);
 //   }
-// };
+// };i
 
-// const sendMessageToActiveTab = () => {
-//   browser.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-//     ensureSendMessage(tabs[0].id, { greeting: "hello" });
-//   });
-// };
+const scheduleDailyReset = (amount: number) => {
+  // Calculate the time until the next reset (24 hours from now)
+  // if (newCreditDate.value > new Date().getTime()) return;
+
+  // const currentTime = new Date();
+  // const nextResetTime = new Date(currentTime);
+  // nextResetTime.setDate(currentTime.getDate() + 1);
+  // nextResetTime.setHours(0, 0, 0, 0); // Reset time to midnight
+
+  // credits.value = amount;
+  newCreditDate.value = 1000;
+
+  // Schedule the reset and recursively call this function to schedule the next one
+};
+
+scheduleDailyReset(creditResetAmount);
 
 // sendMessageToActiveTab();
