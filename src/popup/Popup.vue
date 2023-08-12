@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { sendMessage } from "webext-bridge/popup";
-import { token, credits, newCreditDate } from "~/logic/storage";
+import { token, credits, newCreditDate, fontSize } from "~/logic/storage";
 
 // const openOptionsPage = () => {
 //   browser.runtime.openOptionsPage();
 // }
+
+const creditResetAmount = 10;
 
 const redirectIfNoAuth = () => {
   const webUrl = "https://respond-buddy-web.vercel.app/";
@@ -28,23 +30,63 @@ const onDashboardClick = () => {
   browser.tabs.create({ url: webUrl });
 };
 
+const onSettingClick = async () => {
+  await browser.runtime.openOptionsPage();
+};
+
 const onChatClick = () => {
   sendMessage("toggle-chat", { toggle: true }, "background");
 };
+
+const scheduleDailyReset = (amount: number) => {
+  // Calculate the time until the next reset (24 hours from now)
+  if (newCreditDate.value > new Date().getTime()) return;
+
+  const currentTime = new Date();
+  const nextResetTime = new Date(currentTime);
+  nextResetTime.setDate(currentTime.getDate() + 1);
+  nextResetTime.setHours(0, 0, 0, 0); // Reset time to midnight
+
+  credits.value = amount;
+  newCreditDate.value = nextResetTime.getTime();
+
+  // Schedule the reset and recursively call this function to schedule the next one
+};
+
+scheduleDailyReset(creditResetAmount);
 
 redirectIfNoAuth();
 </script>
 
 <template>
   <main class="w-[300px] px-4 py-5 text-gray-700 space-y-1">
-    {{ newCreditDate }}
     <div class="flex pb-2">
       <img
         src="/assets/rb-icon.png"
         class="text-slate-700 text-lg"
-        style="width: 32px; margin-top: -2px"
+        style="width: 36px; margin-top: -2px"
       />
-      <div class="text-lg font-bold">Respond Buddy</div>
+      <div class="w-full text-lg font-bold">Respond Buddy</div>
+      <button type="button" class="mr-4" @click="onSettingClick">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="icon icon-tabler icon-tabler-settings"
+          width="19"
+          height="19"
+          viewBox="0 0 24 24"
+          stroke-width="2"
+          stroke="currentColor"
+          fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+          <path
+            d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"
+          />
+          <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+        </svg>
+      </button>
     </div>
     <div class="flex">
       <button
@@ -55,6 +97,7 @@ redirectIfNoAuth();
       >
         Go to Dashboard
       </button>
+
       <button
         v-if="!token"
         type="button"
@@ -75,7 +118,7 @@ redirectIfNoAuth();
     <div class="flex">
       <button
         type="button"
-        class="flex flex-col w-full items-center justify-center text-white bg-[#050708] hover:bg-[#050708]/80 focus:ring-4 focus:outline-none focus:ring-[#050708]/50 font-medium rounded-lg text-xs px-5 py-2.5 dark:hover:bg-[#050708]/40 dark:focus:ring-gray-600 mr-2 mb-2"
+        class="flex flex-col w-full items-center justify-center text-white focus:ring-4 focus:outline-none bg-gradient-to-br from-pink-400 to-blue-800 focus:ring-green-200 font-medium rounded-lg text-xs px-5 py-2.5 dark:hover:bg-[#050708]/40 dark:focus:ring-gray-600 mr-2 mb-2"
         @click="onChatClick"
       >
         <div class="flex items-center justify-center">

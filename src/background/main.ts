@@ -122,7 +122,28 @@ onMessage("ask-chat", async (message) => {
       currentWindow: true,
     });
     await processMessage(message?.data?.message, tabs[0].id);
+    return {
+      credits: credits.value,
+    };
   } catch (error) {}
+});
+
+onMessage("get-credits", async (message) => {
+  return {
+    credits: credits.value,
+  };
+});
+
+onMessage("setting", async (message) => {
+  const tabs = await browser?.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  await sendMessage("setting", message?.data, {
+    context: "content-script",
+    tabId: tabs[0].id,
+  });
 });
 
 onMessage("toggle-chat", async (message) => {
@@ -271,21 +292,21 @@ const callGPTMessage = async (message: string) => {
 //   }
 // };i
 
-const scheduleDailyReset = (amount: number) => {
-  // Calculate the time until the next reset (24 hours from now)
-  // if (newCreditDate.value > new Date().getTime()) return;
+// const scheduleDailyReset = (amount: number) => {
+//   // Calculate the time until the next reset (24 hours from now)
+//   // if (newCreditDate.value > new Date().getTime()) return;
 
-  // const currentTime = new Date();
-  // const nextResetTime = new Date(currentTime);
-  // nextResetTime.setDate(currentTime.getDate() + 1);
-  // nextResetTime.setHours(0, 0, 0, 0); // Reset time to midnight
+//   // const currentTime = new Date();
+//   // const nextResetTime = new Date(currentTime);
+//   // nextResetTime.setDate(currentTime.getDate() + 1);
+//   // nextResetTime.setHours(0, 0, 0, 0); // Reset time to midnight
 
-  // credits.value = amount;
-  newCreditDate.value = 1000;
+//   // credits.value = amount;
+//   newCreditDate.value = 1000;
 
-  // Schedule the reset and recursively call this function to schedule the next one
-};
+//   // Schedule the reset and recursively call this function to schedule the next one
+// };
 
-scheduleDailyReset(creditResetAmount);
+// scheduleDailyReset(creditResetAmount);
 
 // sendMessageToActiveTab();

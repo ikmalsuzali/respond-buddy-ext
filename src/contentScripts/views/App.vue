@@ -21,16 +21,12 @@ const messageInput = ref(null);
 const popover = ref(null);
 const fbaButton = ref(null);
 const credits = ref(0);
-
-const formattedText = (text: string) => {
-  if (text?.includes("\n") || text?.includes("```")) {
-    return text?.replace(/\n/g, "<br>")?.replace(/```/g, "&#96;&#96;&#96;"); // Replace \n with <br> and ``` with &#96;&#96;&#96; for rendering line breaks and backticks
-  } else if (text) {
-    return text;
-  }
-  return "";
-};
+const chatContainer = ref(null);
 const isCopiedTriggered = ref(-1);
+const fontSize = ref(12);
+const settings = ref({
+  fontSize: 12,
+});
 
 const right = ref(0);
 const bottom = ref(0);
@@ -129,6 +125,22 @@ let toolbarItems = ref([
   // },
 ]);
 
+const getCurrentCredits = () => {
+  sendMessage("get-credits", {}, "background").then((response) => {
+    if (!response.credits) return;
+    credits.value = response.credits;
+  });
+};
+
+const formattedText = (text: string) => {
+  if (text?.includes("\n") || text?.includes("```")) {
+    return text?.replace(/\n/g, "<br>")?.replace(/```/g, "&#96;&#96;&#96;"); // Replace \n with <br> and ``` with &#96;&#96;&#96; for rendering line breaks and backticks
+  } else if (text) {
+    return text;
+  }
+  return "";
+};
+
 const onClickToolbarItem = async (index: any) => {
   if (
     toolbarItems.value[index]?.isDropdownOpen === false ||
@@ -208,9 +220,11 @@ const socialMediaContents = ref([
 ]);
 
 const adjustHeight = () => {
-  const textarea = messageInput.value;
-  textarea.style.height = "auto";
-  textarea.style.height = `${Math.min(textarea.scrollHeight, 100)}px`; // Limit to 100px or five lines
+  nextTick(() => {
+    const textarea = messageInput.value;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 100)}px`; // Limit to 100px or five lines
+  });
 };
 
 const shareToSocialMedia = (platform: string, content?: any = {}) => {
@@ -250,10 +264,19 @@ onMessage("app-message", (message) => {
   toggle(true);
   messageData.value.push(message.data?.appMessages);
   isLoading.value = !isLoading.value;
+
+  chatContainer.scrollTop = chatContainer?.scrollHeight;
 });
 
 onMessage("toggle-chat", (message) => {
   toggle(message.data?.toggle);
+});
+
+onMessage("settings", (message) => {
+  settings.value = {
+    ...settings.value,
+    ...message.data,
+  };
 });
 
 const onSendClick = async () => {
@@ -262,7 +285,7 @@ const onSendClick = async () => {
     return;
   }
 
-  await sendMessage(
+  let response = await sendMessage(
     "ask-chat",
     {
       message,
@@ -272,13 +295,16 @@ const onSendClick = async () => {
   questionInput.value = "";
 
   adjustHeight();
+
+  if (!response?.credits) return;
+  else credits.value = response.credits;
 };
 
 const handleOutsideClick = (event) => {
   if (
     event?.target &&
-    (event?.target.id === "vitesse-webext" ||
-      event?.target.closest("#vitesse-webext"))
+    (event?.target.id === "respond-buddy" ||
+      event?.target.closest("#respond-buddy"))
   ) {
     return;
   }
@@ -358,16 +384,23 @@ const showToolbar = () => {
     range?.insertNode(dummy);
 
     const rect = dummy.getBoundingClientRect();
-    console.log(rect);
-    selectionOffsetLeft.value = rect.left;
-    selectionOffsetTop.value = rect.bottom;
+    const parentElement = range?.commonAncestorContainer.parentElement;
+    // Check if the selection is within an input or textarea element
+    if (
+      parentElement &&
+      (parentElement.tagName === "INPUT" ||
+        parentElement.tagName === "TEXTAREA")
+    ) {
+      // Adjust the position to display the toolbar outside the input box
+      selectionOffsetLeft.value =
+        parentElement.offsetLeft + parentElement.offsetWidth + 10; // 10px offset from the right
+      selectionOffsetTop.value = parentElement.offsetTop;
+    } else {
+      selectionOffsetLeft.value = rect.left;
+      selectionOffsetTop.value = rect.bottom;
+    }
 
-    // const range = selection?.getRangeAt(0);
-    // const rect = range?.getBoundingClientRect();
-    // selectionOffsetTop.value = rect?.bottom + 1; // 10px offset
-    // selectionOffsetLeft.value = rect?.right - 1; // 10px offset
     isSelectionShow.value = true;
-
     dummy.parentNode.removeChild(dummy);
   } else {
     isSelectionShow.value = false;
@@ -385,6 +418,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener("mousedown", handleOutsideClick);
 });
+
+getCurrentCredits();
 </script>
 
 <template>
@@ -395,7 +430,8 @@ onBeforeUnmount(() => {
         top: `${selectionOffsetTop}px`,
         left: `${selectionOffsetLeft}px`,
       }"
-      class="popup border border-gray-300 shadow-md rounded-lg z-50 flex p-1"
+      style="z-index: 99999999"
+      class="popup border border-gray-300 shadow-md rounded-lg flex p-1"
     >
       <!-- Add toolbar buttons or items here -->
       <button
@@ -449,6 +485,7 @@ onBeforeUnmount(() => {
       >
         <div
           v-if="messageData.length > 0"
+          ref="chatContainer"
           class="flex-grow overflow-y-auto rounded-lg"
         >
           <div
@@ -467,9 +504,11 @@ onBeforeUnmount(() => {
               :class="[
                 msgGrp?.messages.length - 1 !== msgIndex ? 'mb-3' : 'mb-1',
               ]"
+              :style="`font-size: ${settings.fontSize}px`"
             >
               <pre
                 class="formatted-text my-0 select-all"
+                :style="`font-size: ${settings.fontSize}px`"
                 v-html="formattedText(msgData?.message)"
               ></pre>
               <p
@@ -483,7 +522,7 @@ onBeforeUnmount(() => {
               <p
                 v-else-if="isCopiedTriggered === index"
                 class="italic my-0"
-                style="font-size: 8px"
+                :style="`font-size: ${settings.fontSize}px`"
               >
                 Copied
               </p>
@@ -595,7 +634,7 @@ onBeforeUnmount(() => {
             margin-right: 1px;
           "
         >
-          5
+          {{ credits }}
         </div>
         <img
           src="/assets/rb-icon.png"
@@ -639,7 +678,6 @@ onBeforeUnmount(() => {
 
 .chat-font {
   font-style: normal;
-  font-size: 12px;
   font-weight: 400;
   color: #212121;
 }
@@ -655,7 +693,6 @@ onBeforeUnmount(() => {
 .formatted-text {
   white-space: pre-wrap; /* Preserve whitespace and wrap long lines */
   font-style: normal;
-  font-size: 12px;
   font-weight: 400;
   font-family: "Public Sans", sans-serif !important;
   color: #212121;
