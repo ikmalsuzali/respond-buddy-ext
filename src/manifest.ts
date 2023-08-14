@@ -35,7 +35,7 @@ export async function getManifest() {
       128: "./assets/rb-icon.png",
     },
     permissions: ["storage", "activeTab", "contextMenus"],
-    host_permissions: ["*://*/*"],
+    // host_permissions: [],
     content_scripts: [
       {
         matches: ["<all_urls>"],
