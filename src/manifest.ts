@@ -34,13 +34,7 @@ export async function getManifest() {
       48: "./assets/rb-icon.png",
       128: "./assets/rb-icon.png",
     },
-    permissions: [
-      "tabs",
-      "storage",
-      "activeTab",
-      "contextMenus",
-      "notifications",
-    ],
+    permissions: ["storage", "activeTab", "contextMenus"],
     host_permissions: ["*://*/*"],
     content_scripts: [
       {

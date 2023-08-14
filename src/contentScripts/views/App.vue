@@ -23,13 +23,12 @@ const fbaButton = ref(null);
 const credits = ref(0);
 const chatContainer = ref(null);
 const isCopiedTriggered = ref(-1);
-const fontSize = ref(12);
 const settings = ref({
   fontSize: 12,
 });
 
 const right = ref(0);
-const bottom = ref(0);
+const bottom = ref(45);
 
 let startX = 0;
 let startY = 0;
@@ -279,6 +278,14 @@ onMessage("settings", (message) => {
   };
 });
 
+const onSettingsInit = async () => {
+  let response = await sendMessage("settings", null, "background");
+  console.log("🚀 ~ file: App.vue:285 ~ response:", response);
+  if (response) {
+    settings.value = response;
+  }
+};
+
 const onSendClick = async () => {
   const message = questionInput.value;
   if (!message) {
@@ -412,14 +419,14 @@ document.addEventListener("mouseup", function () {
 });
 
 onMounted(() => {
+  onSettingsInit();
+  getCurrentCredits();
   document.addEventListener("mousedown", handleOutsideClick);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("mousedown", handleOutsideClick);
 });
-
-getCurrentCredits();
 </script>
 
 <template>
@@ -531,7 +538,7 @@ getCurrentCredits();
         </div>
         <div v-else class="flex-grow overflow-y-auto rounded-lg p-2">
           <div class="text-lg">Welcome to Respond Buddy! 👋</div>
-          <div class="text-xs">
+          <div :style="`font-size: ${settings.fontSize}px`">
             Ready to try it? 🤔
             <br />
             <br />
@@ -552,7 +559,9 @@ getCurrentCredits();
               Login / Register
             </button>
           </div>
-          <div class="text-xs">Please share it with your friends! 🙏</div>
+          <div :style="`font-size: ${settings.fontSize}px`">
+            Please share it with your friends! 🙏
+          </div>
           <div class="flex gap-1 border-none">
             <button
               v-for="social in socialMediaContents"

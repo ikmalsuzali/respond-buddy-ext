@@ -7,6 +7,7 @@ import {
   userId,
   credits,
   newCreditDate,
+  fontSize,
 } from "~/logic/storage";
 
 // only on dev mode
@@ -134,16 +135,26 @@ onMessage("get-credits", async (message) => {
   };
 });
 
-onMessage("setting", async (message) => {
+onMessage("settings", async (message) => {
   const tabs = await browser?.tabs.query({
     active: true,
     currentWindow: true,
   });
 
-  await sendMessage("setting", message?.data, {
-    context: "content-script",
-    tabId: tabs[0].id,
-  });
+  console.log("🚀 ~ file: main.ts:149 ~ onMessage ~ message", message);
+
+  let settings = {
+    fontSize: fontSize.value,
+  };
+
+  if (!message?.data?.type) {
+    await sendMessage("settings", settings, {
+      context: "content-script",
+      tabId: tabs[0].id,
+    });
+  }
+
+  return settings;
 });
 
 onMessage("toggle-chat", async (message) => {
