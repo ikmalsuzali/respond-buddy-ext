@@ -6,27 +6,28 @@ import { token, credits, newCreditDate, fontSize } from "~/logic/storage";
 //   browser.runtime.openOptionsPage();
 // }
 
+const creditAmount = ref(credits.value);
 const creditResetAmount = 10;
 
-const redirectIfNoAuth = () => {
-  const webUrl = "https://respond-buddy-web.vercel.app/";
-  if (!token.value) {
-    browser.tabs.create({ url: webUrl });
-  }
-};
+// const redirectIfNoAuth = () => {
+//   const webUrl = "https://app.respondbuddy.com/";
+//   if (!token.value) {
+//     browser.tabs.create({ url: webUrl });
+//   }
+// };
 
 const onLoginClick = () => {
-  const webUrl = "https://respond-buddy-web.vercel.app/login";
+  const webUrl = "https://app.respondbuddy.com/login";
   browser.tabs.create({ url: webUrl });
 };
 
 const onRegisterClick = () => {
-  const webUrl = "https://respond-buddy-web.vercel.app/register";
+  const webUrl = "https://app.respondbuddy.com/register";
   browser.tabs.create({ url: webUrl });
 };
 
 const onDashboardClick = () => {
-  const webUrl = "https://respond-buddy-web.vercel.app";
+  const webUrl = "https://app.respondbuddy.com";
   browser.tabs.create({ url: webUrl });
 };
 
@@ -40,6 +41,7 @@ const onChatClick = () => {
 
 const scheduleDailyReset = (amount: number) => {
   // Calculate the time until the next reset (24 hours from now)
+  if (token.value) return;
   if (newCreditDate.value > new Date().getTime()) return;
 
   const currentTime = new Date();
@@ -53,9 +55,17 @@ const scheduleDailyReset = (amount: number) => {
   // Schedule the reset and recursively call this function to schedule the next one
 };
 
+const getCurrentCredits = () => {
+  if (!token.value) return;
+  sendMessage("get-credits-api", {}, "background").then((response) => {
+    creditAmount.value = response?.credits || credits.value;
+  });
+};
+
+getCurrentCredits();
 scheduleDailyReset(creditResetAmount);
 
-redirectIfNoAuth();
+// redirectIfNoAuth();
 </script>
 
 <template>
@@ -148,7 +158,7 @@ redirectIfNoAuth();
           Start chatting now...
         </div>
         <div style="font-size: 10px" class="font-light mt-1">
-          {{ `😎 ${credits} credits remaining (renewed daily) 😎` }}
+          {{ `😎 ${creditAmount} credits remaining (renewed daily) 😎` }}
         </div>
 
         <!-- <img src="~/assets/message-question.svg" class="w-4 h-4 ml-2" /> -->

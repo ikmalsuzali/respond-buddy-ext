@@ -1,10 +1,28 @@
 <script setup lang="ts">
 import { sendMessage } from "webext-bridge/content-script";
-import { newCreditDate, credits, fontSize } from "~/logic/storage";
+import {
+  newCreditDate,
+  credits,
+  fontSize,
+  chatButtonPosition,
+  userId,
+  messages,
+  token,
+} from "~/logic/storage";
 
 const onResetClick = () => {
   credits.value = 10;
   newCreditDate.value = new Date().getTime();
+};
+
+const onResetAllData = () => {
+  credits.value = 10;
+  newCreditDate.value = new Date().getTime();
+  chatButtonPosition.value = { right: 0, bottom: 0 };
+  fontSize.value = 16;
+  userId.value = "";
+  messages.value = [];
+  token.value = "";
 };
 
 const onSettingsChange = () => {
@@ -36,7 +54,6 @@ const onSettingsChange = () => {
           Configuring your settings will help us personalize your experience
         </p>
         <button @click="onResetClick">Reset Credits</button>
-
         <div
           class="mt-10 space-y-8 border-b border-gray-900/10 pb-12 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0"
         >
@@ -81,6 +98,17 @@ const onSettingsChange = () => {
     <div class="mt-4">
       Powered by Respond Buddy
       <!-- <pixelarticons-zap class="align-middle inline-block" /> -->
+    </div>
+    <button @click="onResetAllData">Reset</button>
+
+    <div class="">
+      <div>Chat Button Position{{ chatButtonPosition }}</div>
+      <div>New Credit Date{{ newCreditDate }}</div>
+      <div>Credits {{ credits }}</div>
+      <div>Font Size{{ fontSize }}</div>
+      <div>User id {{ userId }}</div>
+      <div>Messages {{ messages }}</div>
+      <div>Token {{ token }}</div>
     </div>
   </main>
 </template>

@@ -6,10 +6,8 @@ import { setupApp } from "~/logic/common-setup";
 
 // Firefox `browser.tabs.executeScript()` requires scripts return a primitive value
 (() => {
-  let url = "https://respond-buddy-web.vercel.app";
+  let url = "https://app.respondbuddy.com";
 
-  console.log(window.location);
-  console.log(localStorage?.getItem("accessToken"));
   if (
     window.location.href.includes(url) &&
     localStorage.getItem("accessToken")
@@ -19,7 +17,6 @@ import { setupApp } from "~/logic/common-setup";
     });
     return localStorage?.getItem("accessToken");
   }
-  // communication example: send previous tab title from background page
 
   // mount component to context window
 

@@ -8,7 +8,11 @@ import {
   credits,
   newCreditDate,
   fontSize,
+  chatButtonPosition,
 } from "~/logic/storage";
+
+let webUrl = "https://api.respondbuddy.com";
+// let webUrl = "http://0.0.0.0:8080";
 
 // only on dev mode
 if (import.meta.hot) {
@@ -16,6 +20,8 @@ if (import.meta.hot) {
   import("/@vite/client");
   // load latest content script
   import("./contentScriptHMR");
+
+  // webUrl = "http://0.0.0.0:8080";
 }
 
 const creditResetAmount = 10;
@@ -68,10 +74,6 @@ browser.runtime.onInstalled.addListener((): void => {
   });
 });
 
-if (typeof chrome?.app?.isInstalled !== "undefined") {
-  browser.runtime.sendMessage("test");
-}
-
 let previousTabId = 0;
 
 // communication example: send previous tab title from background page
@@ -82,6 +84,9 @@ browser.tabs.onActivated.addListener(async ({ tabId }) => {
     previousTabId = tabId;
     return;
   }
+
+  creditInit();
+  messagesInit();
 
   let tab: Tabs.Tab;
 
@@ -104,13 +109,13 @@ browser.action.onClicked.addListener(async () => {});
 
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "summarize") {
-    processMessage(`Summarize: ${info.selectionText}`, tab.id);
+    processMessage(`Summarize: ${info.selectionText}`, tab.id, {});
   } else if (info.menuItemId === "respond") {
-    processMessage(`Respond: ${info.selectionText}`, tab.id);
+    processMessage(`Respond: ${info.selectionText}`, tab.id, {});
   } else if (info.menuItemId === "simplify") {
-    processMessage(`Simplify: ${info.selectionText}`, tab.id);
+    processMessage(`Simplify: ${info.selectionText}`, tab.id, {});
   } else if (info.menuItemId === "custom-response") {
-    processMessage(`Respond: ${info.selectionText}`, tab.id);
+    processMessage(`Respond: ${info.selectionText}`, tab.id, {});
   }
 
   // sendMessage(info.selectionText);
@@ -122,7 +127,12 @@ onMessage("ask-chat", async (message) => {
       active: true,
       currentWindow: true,
     });
-    await processMessage(message?.data?.message, tabs[0].id);
+
+    await processMessage(
+      message?.data?.message,
+      tabs[0].id,
+      message.data?.metadata || {}
+    );
     return {
       credits: credits.value,
     };
@@ -140,8 +150,6 @@ onMessage("settings", async (message) => {
     active: true,
     currentWindow: true,
   });
-
-  console.log("🚀 ~ file: main.ts:149 ~ onMessage ~ message", message);
 
   let settings = {
     fontSize: fontSize.value,
@@ -174,6 +182,14 @@ onMessage("get-access-token", async (data) => {
   token.value = data.data.accessToken.trim();
 });
 
+// onMessage("get", (key) => {
+//   return storage[key];
+// });
+
+// onMessage("set", ({ key, value }) => {
+//   storage[key] = value;
+// });
+
 // onMessage("get-current-tab", async () => {
 //   try {
 //     const tab = await browser.tabs.get(previousTabId);
@@ -187,7 +203,7 @@ onMessage("get-access-token", async (data) => {
 //   }
 // });
 
-const processMessage = async (message: string, tabId: number) => {
+const processMessage = async (message: string, tabId: number, metadata: {}) => {
   const senderMessage = {
     senderId: userId.value,
     messages: [
@@ -205,7 +221,7 @@ const processMessage = async (message: string, tabId: number) => {
     { context: "content-script", tabId }
   );
 
-  const responseMessage = await callGPTMessage(message);
+  const responseMessage = await callGPTMessage(message, metadata);
 
   const botMessage = {
     senderId: null,
@@ -237,25 +253,46 @@ const processMessage = async (message: string, tabId: number) => {
 //   );
 // });
 
-const callGPTMessage = async (message: string) => {
+const creditInit = async () => {
+  if (!token.value) return credits.value;
   try {
+    const data = await fetch(`${webUrl}/api/v1/credit`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+    });
+
+    let response = await data.json();
+
+    if (response.credits) {
+      credits.value = response.credits;
+    }
+
+    return credits.value;
+  } catch (error) {}
+};
+
+const callGPTMessage = async (message: string, metadata: any) => {
+  try {
+    let userIdentity = !token.value ? userId.value : null;
     if (credits.value <= 0)
       return "You have no credits left, please upgrade your plan.";
 
     if (message) {
-      const data = await fetch(
-        "https://api.respondbuddy.com/api/v1/message/free",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message,
-            user_id: userId.value,
-          }),
-        }
-      );
+      const data = await fetch(`${webUrl}/api/v1/message`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${token.value}`,
+        },
+        body: JSON.stringify({
+          message,
+          user_identity: userIdentity,
+          metadata,
+        }),
+      });
 
       credits.value = credits.value - 1;
 
@@ -267,6 +304,32 @@ const callGPTMessage = async (message: string) => {
     return "Failed to get response, try again later.";
   }
 };
+
+const messagesInit = async () => {
+  try {
+    const data = await fetch(`${webUrl}/api/v1/message`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+      body: JSON.stringify({
+        user_id: userId.value,
+        token: token.value,
+      }),
+    });
+
+    let response = await data.json();
+
+    messages.value = response?.data?.messages || [];
+    messages.value = messages.value.slice(-20);
+  } catch (error) {
+    return "Failed to get response, try again later.";
+  }
+};
+
+// creditInit();
+// messagesInit();
 
 // const ensureSendMessage = async (tabId, message, callback) => {
 //   try {
@@ -321,3 +384,75 @@ const callGPTMessage = async (message: string) => {
 // scheduleDailyReset(creditResetAmount);
 
 // sendMessageToActiveTab();
+
+// -- Template -- //
+
+// onMessage('get', (key) => {
+//   return storage[key];
+// });
+
+// onMessage('set', ({ key, value }) => {
+//   storage[key] = value;
+// });
+
+// Chat Button Position
+onMessage("get-chat-button-position", () => {
+  return chatButtonPosition.value;
+});
+
+onMessage("set-chat-button-position", (message) => {
+  chatButtonPosition.value = {
+    right: message.data?.right,
+    bottom: message.data?.bottom,
+  };
+});
+
+// Chat Button Position
+onMessage("get-font-size", () => {
+  return fontSize.value;
+});
+
+onMessage("set-font-size", (message) => {
+  fontSize.value = message.data?.fontSize;
+});
+
+// Token
+onMessage("get-token", () => {
+  return token.value;
+});
+
+onMessage("set-token", (message) => {
+  token.value = message.data?.token;
+});
+
+// Credit
+onMessage("get-credits", () => {
+  return credits.value;
+});
+
+onMessage("get-credits-api", async () => {
+  let credits = await creditInit();
+  return credits;
+});
+
+onMessage("set-credits", (message) => {
+  credits.value = message.data?.credits;
+});
+
+// User id
+onMessage("get-user-id", () => {
+  return userId.value;
+});
+
+onMessage("set-user-id", (message) => {
+  userId.value = message.data?.userId;
+});
+
+// Messages
+onMessage("get-messages", () => {
+  return messages.value;
+});
+
+onMessage("set-messages", (message) => {
+  messages.value = message.data?.messages;
+});

@@ -10,7 +10,6 @@ import whatsappSvg from "../../assets/whatsapp-svgrepo.svg";
 import clipboardTextSvg from "../../assets/clipboard-text.svg";
 import analyzeSvg from "../../assets/analyze.svg";
 import fileInfoSvg from "../../assets/file-info.svg";
-// import helpHexagonSvg from "../../assets/help-hexagon.svg";
 import languageSvg from "../../assets/language.svg";
 import messageQuestionSvg from "../../assets/message-question.svg";
 import oneTwoThreeSvg from "../../assets/onetwothree.svg";
@@ -22,10 +21,12 @@ const popover = ref(null);
 const fbaButton = ref(null);
 const credits = ref(0);
 const chatContainer = ref(null);
+const isSidebar = ref(true);
 const isCopiedTriggered = ref(-1);
 const settings = ref({
   fontSize: 12,
 });
+const token = ref("");
 
 const right = ref(0);
 const bottom = ref(45);
@@ -83,11 +84,11 @@ let toolbarItems = ref([
         name: "Italian",
         template: "Translate to Italian: ",
       },
-      {
-        key: "chinese",
-        name: "Chinese",
-        template: "Translate to Chinese: ",
-      },
+      // {
+      //   key: "chinese",
+      //   name: "Chinese",
+      //   template: "Translate to Chinese: ",
+      // },
     ],
     isHovered: false,
     isDropdownOpen: false,
@@ -124,12 +125,12 @@ let toolbarItems = ref([
   // },
 ]);
 
-const getCurrentCredits = () => {
-  sendMessage("get-credits", {}, "background").then((response) => {
-    if (!response.credits) return;
-    credits.value = response.credits;
-  });
-};
+// const getCurrentCredits = () => {
+//   sendMessage("get-credits", {}, "background").then((response) => {
+//     if (!response.credits) return;
+//     credits.value = response.credits;
+//   });
+// };
 
 const formattedText = (text: string) => {
   if (text?.includes("\n") || text?.includes("```")) {
@@ -226,6 +227,16 @@ const adjustHeight = () => {
   });
 };
 
+const onClickLoginRegister = (type: string) => {
+  const loginWebUrl = "https://app.respondbuddy.com/";
+  const registerWebUrl = "https://app.respondbuddy.com/register";
+  if (type === "register") {
+    window.open(registerWebUrl, "_blank");
+    return;
+  }
+  window.open(loginWebUrl, "_blank");
+};
+
 const shareToSocialMedia = (platform: string, content?: any = {}) => {
   const url = encodeURIComponent(content.url || "https://respondbuddy.com");
   const text = encodeURIComponent(
@@ -259,6 +270,15 @@ const shareToSocialMedia = (platform: string, content?: any = {}) => {
   window.open(shareUrl, "_blank");
 };
 
+const onDashboardClick = () => {
+  const webUrl = "https://app.respondbuddy.com";
+  window.open(webUrl, "_blank");
+};
+
+onMessage("toggle-chat", (_) => {
+  toggle(true);
+});
+
 onMessage("app-message", (message) => {
   toggle(true);
   messageData.value.push(message.data?.appMessages);
@@ -266,25 +286,6 @@ onMessage("app-message", (message) => {
 
   chatContainer.scrollTop = chatContainer?.scrollHeight;
 });
-
-onMessage("toggle-chat", (message) => {
-  toggle(message.data?.toggle);
-});
-
-onMessage("settings", (message) => {
-  settings.value = {
-    ...settings.value,
-    ...message.data,
-  };
-});
-
-const onSettingsInit = async () => {
-  let response = await sendMessage("settings", null, "background");
-  console.log("🚀 ~ file: App.vue:285 ~ response:", response);
-  if (response) {
-    settings.value = response;
-  }
-};
 
 const onSendClick = async () => {
   const message = questionInput.value;
@@ -296,6 +297,10 @@ const onSendClick = async () => {
     "ask-chat",
     {
       message,
+      metadata: {
+        current_website_url: window.location.href,
+        url_body_content: document.body.innerHTML,
+      },
     },
     "background"
   );
@@ -344,6 +349,7 @@ const dragStart = (e) => {
 const dragMove = (e) => {
   right.value += startX - e.clientX;
   bottom.value += startY - e.clientY;
+  setChatButtonPosition({ right: right.value, bottom: bottom.value });
   startX = e.clientX;
   startY = e.clientY;
 };
@@ -418,9 +424,68 @@ document.addEventListener("mouseup", function () {
   showToolbar();
 });
 
+const getToken = () => {
+  sendMessage("get-token", {}, "background").then((response) => {
+    token.value = response || "";
+  });
+};
+
+// -- Template -- //
+// const get = async (key) => {
+//   return await sendMessage("get", key);
+// };
+
+// const set = async (key, value) => {
+//   return await sendMessage("set", { key, value });
+// };
+
+const getFontSize = () => {
+  sendMessage("get-font-size", {}, "background").then((response) => {
+    settings.value = {
+      ...settings.value,
+      fontSize: response.fontSize || 14,
+    };
+  });
+};
+
+const setFontSize = () => {
+  sendMessage("set-font-size", { fontSize: settings.value.fontSize });
+};
+
+const getChatButtonPosition = () => {
+  sendMessage("get-chat-button-position", {}, "background").then((response) => {
+    right.value = response?.right || 0;
+    bottom.value = response?.bottom || 45;
+  });
+};
+
+const setChatButtonPosition = ({ right, bottom }) => {
+  sendMessage(
+    "set-chat-button-position",
+    {
+      right: right,
+      bottom: bottom,
+    },
+    "background"
+  );
+};
+
+const getMessages = () => {
+  sendMessage("get-messages", {}, "background").then((response) => {
+    messageData.value = response?.messages || [];
+  });
+};
+
+const setMessages = () => {
+  sendMessage("set-messages", { messages: messageData.value });
+};
+
 onMounted(() => {
-  onSettingsInit();
-  getCurrentCredits();
+  getToken();
+  getFontSize();
+  getChatButtonPosition();
+  // onSettingsInit();
+  // getCurrentCredits();
   document.addEventListener("mousedown", handleOutsideClick);
 });
 
@@ -437,7 +502,7 @@ onBeforeUnmount(() => {
         top: `${selectionOffsetTop}px`,
         left: `${selectionOffsetLeft}px`,
       }"
-      style="z-index: 99999999"
+      style="z-index: 9999999999"
       class="popup border border-gray-300 shadow-md rounded-lg flex p-1"
     >
       <!-- Add toolbar buttons or items here -->
@@ -453,13 +518,18 @@ onBeforeUnmount(() => {
         <img
           :src="item.icon"
           :alt="item.name"
-          class="w-4 h-4 focus:text-blue-500 hover:text-blue-300"
+          class="w-5 h-5 focus:text-blue-500 hover:text-blue-300"
         />
         <!-- Tooltip -->
         <span
           v-if="item.isHovered"
           class="px-1 text-xs text-gray-100 rounded-md absolute left-1/2 -translate-x-1/2 translate-y-full"
-          style="background-color: #448aff"
+          style="
+            background-color: #448aff;
+            --un-translate-y: 200%;
+            padding: 2px;
+            color: white;
+          "
           >{{ item.name }}</span
         >
         <!-- Dropdown -->
@@ -476,12 +546,180 @@ onBeforeUnmount(() => {
         </div>
       </button>
     </div>
+    <div v-show="show && isSidebar" class="overlay">
+      <div class="sidebar flex flex-col">
+        <div
+          v-if="messageData.length > 0"
+          ref="chatContainer"
+          class="flex-grow overflow-y-auto rounded-lg"
+        >
+          <div
+            v-for="(msgGrp, index) in messageData"
+            :key="index"
+            style="border-bottom: 1px solid rgb(235, 234, 226)"
+            class="chat-group d-flex align-start pa-1"
+            :class="
+              msgGrp.senderId ? 'sender-msg-container' : 'bot-msg-container'
+            "
+          >
+            <div
+              v-for="(msgData, msgIndex) in msgGrp.messages"
+              :key="msgIndex"
+              class="chat-font ml-1"
+              :class="[
+                msgGrp?.messages.length - 1 !== msgIndex ? 'mb-3' : 'mb-1',
+              ]"
+              :style="`font-size: ${settings.fontSize}px`"
+            >
+              <pre
+                class="formatted-text my-0"
+                :style="`font-size: ${settings.fontSize}px; `"
+                v-html="formattedText(msgData?.message)"
+              ></pre>
+              <p
+                v-if="isCopiedTriggered === -1 || isCopiedTriggered !== index"
+                class="text-blue-600 hover:text-blue-800 underline text-xs my-0 cursor-pointer"
+                style="font-size: 8px"
+                @click="copyMessage(msgData?.message, index)"
+              >
+                Copy
+              </p>
+              <p
+                v-else-if="isCopiedTriggered === index"
+                class="italic my-0"
+                :style="`font-size: ${settings.fontSize}px`"
+              >
+                Copied
+              </p>
+            </div>
+          </div>
+        </div>
+        <div v-else class="flex-grow overflow-y-auto rounded-lg p-6 space-y-2">
+          <div class="bold" :style="`font-size: ${settings.fontSize + 1}px;`">
+            Welcome to Respond Buddy! 👋
+          </div>
+          <div :style="`font-size: ${settings.fontSize}px; line-height: 24px`">
+            Ready to try it? 🤔 Highlight on any text in your browser 🖱️, choose
+            from options like 'Summarize,' 'Simplify,' or 'Expand.'
+            <br />
+            <br />
+            Or start by asking a question at the bottom in the chat box. 📝
+            <br />
+            <br />
+          </div>
+          <div
+            v-if="!token"
+            class="flex flex-col gap-2 mt-2"
+            :style="`font-size: ${settings.fontSize + 1}px;`"
+          >
+            <div>If you love it, signup or login 😍</div>
+            <div class="flex">
+              <button
+                @click="onClickLoginRegister('login')"
+                type="button"
+                class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                style="color: white"
+              >
+                Login
+              </button>
+              <button
+                @click="onClickLoginRegister('register')"
+                type="button"
+                class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                style="color: white"
+              >
+                Register
+              </button>
+            </div>
+          </div>
+          <div
+            v-else
+            class="flex flex-col gap-2 mt-2"
+            :style="`font-size: ${settings.fontSize + 1}px;`"
+          >
+            <button
+              @click="onDashboardClick"
+              type="button"
+              class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+              style="color: white"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+          <div :style="`font-size: ${settings.fontSize}px`">
+            Please share it with your friends! 🙏
+          </div>
+          <div class="flex gap-1 border-none">
+            <button
+              v-for="social in socialMediaContents"
+              class="py-2 bg-transparent border-none hover:text-gray-300 cursor-pointer hover:shadow-lg rounded-full active:scale-95 focus:outline-none"
+              @click="shareToSocialMedia(social.type)"
+            >
+              <img class="w-7 h-7" :src="social.icon" />
+            </button>
+          </div>
+        </div>
+        <div
+          class="flex relative w-full bg-white-100 border-t-1 border-slate-400"
+          style="border-top: solid; border-width: 1px; border-color: #cfd8dc"
+        >
+          <textarea
+            v-model="questionInput"
+            :disabled="isLoading"
+            ref="messageInput"
+            type="search"
+            id="message-input"
+            :class="isLoading ? 'cursor-wait' : ''"
+            class="block w-full m-2 z-20 text-md text-slate-900 font-sans overflow-y-auto"
+            rows="1"
+            style="
+              background: transparent;
+              border: none;
+              outline: none;
+              resize: none;
+            "
+            :placeholder="!isLoading ? 'Ask a question...' : 'Loading...'"
+            required
+            @input="adjustHeight"
+          />
+          <button
+            v-if="!isLoading"
+            class="flex bg-white cursor-pointer border-none items-center justify-center mx-2 active:scale-95 focus:outline-none"
+            @click="onSendClick"
+          >
+            <!-- Replace this with your send icon -->
+            <img
+              src="/assets/tabler-send.svg"
+              class="text-slate-700 text-lg w-5 h-5 focus:text-blue-500 hover:text-blue-300"
+            />
+          </button>
+          <button v-else type="button" class="bg-white border-none" disabled>
+            <svg
+              aria-hidden="true"
+              class="inline w-5 h-5 mr-2 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
+              viewBox="0 0 100 101"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+                fill="currentColor"
+              />
+              <path
+                d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                fill="currentFill"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
     <div
       :style="{ right: `${right}px`, bottom: `${bottom}px` }"
       class="fixed flex right-0 bottom-0 m-5 z-100 flex items-end font-sans leading-1em"
     >
-      <div
-        v-show="show"
+      <!-- <div
+        v-show="show && !isSidebar"
         id="popover"
         ref="popover"
         class="flex flex-col bg-white text-gray-800 rounded-lg shadow-lg w-max h-min m-2"
@@ -514,7 +752,7 @@ onBeforeUnmount(() => {
               :style="`font-size: ${settings.fontSize}px`"
             >
               <pre
-                class="formatted-text my-0 select-all"
+                class="formatted-text my-0"
                 :style="`font-size: ${settings.fontSize}px`"
                 v-html="formattedText(msgData?.message)"
               ></pre>
@@ -536,9 +774,12 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
-        <div v-else class="flex-grow overflow-y-auto rounded-lg p-2">
-          <div class="text-lg">Welcome to Respond Buddy! 👋</div>
-          <div :style="`font-size: ${settings.fontSize}px`">
+        <div
+          v-else
+          class="flex-grow overflow-y-auto rounded-lg p-2 space-y-2 text-primary"
+        >
+          <div class="text-xl">Welcome to Respond Buddy! 👋</div>
+          <div :style="`font-size: ${settings.fontSize}px; line-height: 24px`">
             Ready to try it? 🤔
             <br />
             <br />
@@ -553,6 +794,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="flex gap-2 mt-2">
             <button
+              @click="onClickLoginRegister"
               type="button"
               class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-sm px-5 py-2 text-center mr-2 mb-2 border-none"
             >
@@ -600,7 +842,6 @@ onBeforeUnmount(() => {
             class="flex bg-white cursor-pointer border-none items-center justify-center mx-2 active:scale-95 focus:outline-none"
             @click="onSendClick"
           >
-            <!-- Replace this with your send icon -->
             <img
               src="/assets/tabler-send.svg"
               class="text-slate-700 text-lg w-4 h-4 focus:text-blue-500 hover:text-blue-300"
@@ -625,14 +866,15 @@ onBeforeUnmount(() => {
             </svg>
           </button>
         </div>
-      </div>
+      </div> -->
       <button
         class="flex rounded-full cursor-pointer border-none bg-transparent"
+        id="respond-buddy-fba-button"
         ref="fbaButton"
         @mousedown.prevent="dragStart"
         @click.stop="toggle()"
       >
-        <div
+        <!-- <div
           v-if="!show"
           class="absolute shadow-xl top-0 right-0 bg-red-500 rounded-full text-white h-5 w-5 flex items-center justify-center"
           style="
@@ -644,11 +886,16 @@ onBeforeUnmount(() => {
           "
         >
           {{ credits }}
-        </div>
+        </div> -->
         <img
-          src="/assets/rb-icon.png"
+          src="/assets/rb-icon-2.png"
           class="text-lg"
-          style="width: 38px; padding-top: 3px"
+          style="
+            width: 50px;
+            padding-top: 3px;
+            border-radius: 100%;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.15);
+          "
         />
       </button>
     </div>
@@ -657,6 +904,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* Add rotating animation to the icon */
+@import url("https://fonts.cdnfonts.com/css/open-sans");
+
+* {
+  font-family: "Open Sans", sans-serif;
+  color: #212121;
+}
 @keyframes rotate {
   from {
     transform: rotate(0deg);
@@ -703,7 +956,7 @@ onBeforeUnmount(() => {
   white-space: pre-wrap; /* Preserve whitespace and wrap long lines */
   font-style: normal;
   font-weight: 400;
-  font-family: "Public Sans", sans-serif !important;
+  font-family: "circular";
   color: #212121;
 }
 
@@ -716,6 +969,37 @@ onBeforeUnmount(() => {
   background-color: white;
   border: 1px solid black;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  z-index: 99999;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 75%;
+  width: calc(100% - 75%);
+  height: 100%;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: end;
+}
+
+.sidebar {
+  background-color: white;
+  width: 100%;
+  height: 95%;
+  overflow-y: auto;
+  border-radius: 12px;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.5);
+}
+
+.overlay-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 9998;
 }
 </style>
