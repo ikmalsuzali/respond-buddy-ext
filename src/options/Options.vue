@@ -53,7 +53,6 @@ const onSettingsChange = () => {
         <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
           Configuring your settings will help us personalize your experience
         </p>
-        <button @click="onResetClick">Reset Credits</button>
         <div
           class="mt-10 space-y-8 border-b border-gray-900/10 pb-12 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0"
         >
@@ -99,9 +98,10 @@ const onSettingsChange = () => {
       Powered by Respond Buddy
       <!-- <pixelarticons-zap class="align-middle inline-block" /> -->
     </div>
-    <button @click="onResetAllData">Reset</button>
+    <button @click="onResetAllData" class="text-white">Reset</button>
+    <div class="text-white" @click="onResetClick">Reset Credits</div>
 
-    <div class="">
+    <div class="text-white">
       <div>Chat Button Position{{ chatButtonPosition }}</div>
       <div>New Credit Date{{ newCreditDate }}</div>
       <div>Credits {{ credits }}</div>

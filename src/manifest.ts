@@ -52,7 +52,7 @@ export async function getManifest() {
       extension_pages: isDev
         ? // this is required on dev for Vite script to load
           `script-src \'self\' http://localhost:${port}; object-src \'self\'`
-        : "script-src 'self'; object-src 'self'",
+        : "script-src 'self'; object-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; object-src 'self'",
     },
   };
 
