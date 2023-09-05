@@ -23,6 +23,7 @@ const credits = ref(0);
 const chatContainer = ref(null);
 const isSidebar = ref(true);
 const isCopiedTriggered = ref(-1);
+const popoverType = ref("selection");
 const settings = ref({
   fontSize: 12,
 });
@@ -125,13 +126,6 @@ let toolbarItems = ref([
   // },
 ]);
 
-// const getCurrentCredits = () => {
-//   sendMessage("get-credits", {}, "background").then((response) => {
-//     if (!response.credits) return;
-//     credits.value = response.credits;
-//   });
-// };
-
 const formattedText = (text: string) => {
   if (text?.includes("\n") || text?.includes("```")) {
     return text?.replace(/\n/g, "<br>")?.replace(/```/g, "&#96;&#96;&#96;"); // Replace \n with <br> and ``` with &#96;&#96;&#96; for rendering line breaks and backticks
@@ -164,7 +158,7 @@ const onClickToolbarItem = async (index: any) => {
 
   // If the toolbar item has template, send a message to the background script
   await sendMessage("ask-chat", {
-    message: `${toolbarItems.value[index]?.template}${selectedText.value}}`,
+    message: `${toolbarItems.value[index]?.template}${selectedText.value}`,
   });
 };
 
@@ -287,6 +281,18 @@ onMessage("app-message", (message) => {
   chatContainer.scrollTop = chatContainer?.scrollHeight;
 });
 
+onMessage("tab-updated", (message) => {
+  console.log("🚀 ~ file: App.vue:285 ~ onMessage ~ message:", message);
+  if (message?.data?.changeInfo?.status === "complete") {
+    console.log("🚀 ~ file: App.vue:287 ~ onMessage ~ trigger:");
+    // set a delay of 2 second then trigger the function
+    addHoverStyles();
+    setTimeout(() => {
+      // renderImageIconButton();
+    }, 2000);
+  }
+});
+
 const onSendClick = async () => {
   const message = questionInput.value;
   if (!message) {
@@ -385,11 +391,12 @@ const onClickToolbarOption = async (message: string) => {
   });
 };
 
-const showToolbar = () => {
+const showToolbar = (event?: any, meta?: any) => {
   if (show.value) return;
   const selection = window.getSelection();
   selectedText.value = selection?.toString().trim();
   if (selectedText.value.length > 0) {
+    popoverType.value = "selection";
     const range = selection?.getRangeAt(0).cloneRange();
     range?.collapse(false);
 
@@ -416,7 +423,27 @@ const showToolbar = () => {
     isSelectionShow.value = true;
     dummy.parentNode.removeChild(dummy);
   } else {
-    isSelectionShow.value = false;
+    // Check if the event target (clicked item) is an image or any other specific element
+    if (
+      event &&
+      event?.target &&
+      event?.target?.offsetParent?.className.includes("image-selected")
+    ) {
+      popoverType.value = "image";
+      const rect = event.target.getBoundingClientRect();
+      selectionOffsetLeft.value = Math.min(
+        window.innerWidth - 200,
+        rect.left + window.scrollX
+      );
+      selectionOffsetTop.value = Math.max(
+        window.innerHeight,
+        rect.bottom + window.scrollY
+      );
+
+      isSelectionShow.value = true;
+    } else {
+      isSelectionShow.value = false;
+    }
   }
 };
 
@@ -480,10 +507,73 @@ const setMessages = () => {
   sendMessage("set-messages", { messages: messageData.value });
 };
 
+const renderImageIconButton = () => {
+  // Get all images in the document
+  const images = document.querySelectorAll("img");
+  console.log(images);
+
+  images.forEach((img) => {
+    // Check if image is greater than 100px in width or height
+    if (img.width < 50 || img.height < 50) return;
+
+    // For each image, create a container
+    const container = document.createElement("div");
+    container.style.position = "relative";
+    container.style.display = "inline-block";
+
+    img.parentNode.insertBefore(container, img);
+    container.appendChild(img);
+
+    // Create the icon button
+    const button = document.createElement("button");
+    button.style.position = "absolute";
+    button.style.top = "0";
+    button.style.right = "0";
+    button.style.border = "none";
+    button.style.borderRadius = "50%";
+    button.style.margin = "5px";
+    button.classList.add("expand-on-hover"); // Add the class
+    button.classList.add("image-selected"); // Add the class
+    button.onclick = function (event) {
+      event?.stopPropagation();
+      event?.preventDefault();
+      event?.stopImmediatePropagation();
+      showToolbar(event, {
+        popoverType: "image",
+      });
+    };
+
+    const icon = document.createElement("img");
+    icon.src = browser.runtime.getURL("assets/rb-icon.png"); // Replace 'icon.svg' with 'icon.png' if you're using a PNG
+    icon.style.width = "15px"; // Adjust size as necessary
+    icon.style.height = "15px"; // Adjust size as necessary
+
+    button.appendChild(icon);
+
+    container.appendChild(button);
+  });
+};
+
+const addHoverStyles = () => {
+  const style = document.createElement("style");
+  style.innerHTML = `
+        .expand-on-hover {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .expand-on-hover:hover {
+            transform: scale(1.2);
+        }
+    `;
+  document.head.appendChild(style);
+};
+
 onMounted(() => {
-  getToken();
+  // getToken();
   getFontSize();
   getChatButtonPosition();
+  // addHoverStyles();
+  // renderImageIconButton();
   // onSettingsInit();
   // getCurrentCredits();
   document.addEventListener("mousedown", handleOutsideClick);
@@ -501,6 +591,11 @@ onBeforeUnmount(() => {
       :style="{
         top: `${selectionOffsetTop}px`,
         left: `${selectionOffsetLeft}px`,
+        position: `${
+          popoverType == 'selection'
+            ? 'fixed !important'
+            : 'absolute !important'
+        }`,
       }"
       style="z-index: 9999999999"
       class="popup border border-gray-300 shadow-md rounded-lg flex p-1"
@@ -547,7 +642,12 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <div v-show="show && isSidebar" class="overlay">
-      <div class="sidebar flex flex-col">
+      <div
+        class="sidebar flex flex-col"
+        @click.stop
+        @keydown.stop
+        @keypress.stop
+      >
         <div
           v-if="messageData.length > 0"
           ref="chatContainer"
@@ -556,8 +656,8 @@ onBeforeUnmount(() => {
           <div
             v-for="(msgGrp, index) in messageData"
             :key="index"
-            style="border-bottom: 1px solid rgb(235, 234, 226)"
-            class="chat-group d-flex align-start pa-1"
+            style="border-bottom: 1px solid rgb(235, 234, 226); padding: 10px"
+            class="chat-group d-flex align-start"
             :class="
               msgGrp.senderId ? 'sender-msg-container' : 'bot-msg-container'
             "
@@ -904,7 +1004,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* Add rotating animation to the icon */
-@import url("https://fonts.cdnfonts.com/css/open-sans");
 
 * {
   font-family: "Open Sans", sans-serif;
@@ -966,6 +1065,7 @@ onBeforeUnmount(() => {
 
 .popup {
   position: fixed;
+
   background-color: white;
   border: 1px solid black;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
@@ -1001,5 +1101,13 @@ onBeforeUnmount(() => {
   height: 100%;
   background-color: rgba(0, 0, 0, 0.3);
   z-index: 9998;
+}
+
+.expand-on-hover {
+  transition: transform 0.3s ease-in-out;
+}
+
+.expand-on-hover:hover {
+  transform: scale(1.2);
 }
 </style>

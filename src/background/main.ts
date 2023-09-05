@@ -105,6 +105,18 @@ browser.tabs.onActivated.addListener(async ({ tabId }) => {
   // );
 });
 
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  console.log(
+    "🚀 ~ file: main.ts:109 ~ browser.tabs.onUpdated.addListener ~ changeInfo:",
+    changeInfo
+  );
+  sendMessage(
+    "tab-updated",
+    { tabId, changeInfo, tab },
+    { context: "content-script", tabId }
+  );
+});
+
 browser.action.onClicked.addListener(async () => {});
 
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
