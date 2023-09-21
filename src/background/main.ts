@@ -117,7 +117,6 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 onMessage("ask-chat", async (message) => {
-  console.log("🚀 ~ file: main.ts:120 ~ onMessage ~ message:", message);
   try {
     const tabs = await browser?.tabs.query({
       active: true,
@@ -218,10 +217,6 @@ const processMessage = async (message: string, tabId: number, metadata: {}) => {
   );
 
   const responseMessage = await callGPTMessage(message, metadata, tabId);
-  console.log(
-    "🚀 ~ file: main.ts:221 ~ processMessage ~ responseMessage:",
-    responseMessage
-  );
 
   const botMessage = {
     senderId: null,
@@ -330,8 +325,6 @@ const callGPTMessage = async (message: string, metadata: any, tabId: any) => {
       }),
     });
 
-    console.log("🚀 ~ file: main.ts:297 ~ callGPTMessage ~ data:", data);
-
     credits.value = credits.value - 1;
 
     let botMessage = {
@@ -355,10 +348,8 @@ const callGPTMessage = async (message: string, metadata: any, tabId: any) => {
 
     const transferEncoding = data.headers.get("Transfer-Encoding");
     const contentLength = data.headers.get("Content-Length");
-
     const isMissingContentLength =
       !contentLength || parseInt(contentLength) > 1000000; // Adjust the threshold as needed
-
     if (
       (transferEncoding && transferEncoding.toLowerCase() === "chunked") ||
       isMissingContentLength
@@ -366,13 +357,11 @@ const callGPTMessage = async (message: string, metadata: any, tabId: any) => {
       botMessage.update = true;
 
       const reader = data.body.getReader();
-
       // Start reading the stream and processing its content
       let responseString = "";
       let chunks = [];
       while (true) {
         const { done, value } = await reader.read();
-        console.log("🚀 ~ file: main.ts:369 ~ callGPTMessage ~ value:", value);
 
         // When the stream is fully consumed, done will be true
         if (done) {
@@ -426,7 +415,6 @@ const callGPTMessage = async (message: string, metadata: any, tabId: any) => {
       // return response?.data?.message || "";
     }
   } catch (error) {
-    console.log(error);
     let botMessage = {
       update: true,
       loading: false,

@@ -308,7 +308,6 @@ onMessage("tab-updated", (message) => {
 
 const onSendClick = async () => {
   const message = questionInput.value;
-  console.log("🚀 ~ file: App.vue:311 ~ onSendClick ~ message:", message);
 
   if (!message) {
     return;
