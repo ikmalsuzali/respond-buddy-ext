@@ -1,3 +1,4 @@
+import { parse } from "node:path";
 import { onMessage, sendMessage } from "webext-bridge/background";
 import type { Tabs } from "webextension-polyfill";
 import { generateUUID } from "~/logic/helper";
@@ -9,6 +10,7 @@ import {
   newCreditDate,
   fontSize,
   chatButtonPosition,
+  templates,
 } from "~/logic/storage";
 
 let webUrl = "https://api.respondbuddy.com";
@@ -96,25 +98,6 @@ browser.tabs.onActivated.addListener(async ({ tabId }) => {
   } catch {
     return;
   }
-
-  // eslint-disable-next-line no-console
-  // sendMessage(
-  //   "tab-prev",
-  //   { title: tab.title },
-  //   { context: "content-script", tabId }
-  // );
-});
-
-browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  console.log(
-    "🚀 ~ file: main.ts:109 ~ browser.tabs.onUpdated.addListener ~ changeInfo:",
-    changeInfo
-  );
-  sendMessage(
-    "tab-updated",
-    { tabId, changeInfo, tab },
-    { context: "content-script", tabId }
-  );
 });
 
 browser.action.onClicked.addListener(async () => {});
@@ -134,6 +117,7 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 onMessage("ask-chat", async (message) => {
+  console.log("🚀 ~ file: main.ts:120 ~ onMessage ~ message:", message);
   try {
     const tabs = await browser?.tabs.query({
       active: true,
@@ -233,7 +217,11 @@ const processMessage = async (message: string, tabId: number, metadata: {}) => {
     { context: "content-script", tabId }
   );
 
-  const responseMessage = await callGPTMessage(message, metadata);
+  const responseMessage = await callGPTMessage(message, metadata, tabId);
+  console.log(
+    "🚀 ~ file: main.ts:221 ~ processMessage ~ responseMessage:",
+    responseMessage
+  );
 
   const botMessage = {
     senderId: null,
@@ -247,11 +235,11 @@ const processMessage = async (message: string, tabId: number, metadata: {}) => {
 
   messages.value.push(botMessage);
 
-  await sendMessage(
-    "app-message",
-    { appMessages: botMessage },
-    { context: "content-script", tabId }
-  );
+  // await sendMessage(
+  //   "app-message",
+  //   { appMessages: botMessage },
+  //   { context: "content-script", tabId }
+  // );
 };
 
 // browser.tabs.query({ active: true, currentWindow: true }).then(async (tabs) => {
@@ -264,6 +252,21 @@ const processMessage = async (message: string, tabId: number, metadata: {}) => {
 //     { context: "content-script", tabId: currentTab.id }
 //   );
 // });
+const templatesInit = async () => {
+  if (!token.value) return token.value;
+  try {
+    const data = await fetch(`${webUrl}/api/v1/tags`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+    });
+
+    if (!data || data.length === 0) return;
+    templates.value = templates;
+  } catch (error) {}
+};
 
 const creditInit = async () => {
   if (!token.value) return credits.value;
@@ -286,33 +289,162 @@ const creditInit = async () => {
   } catch (error) {}
 };
 
-const callGPTMessage = async (message: string, metadata: any) => {
+const callGPTMessage = async (message: string, metadata: any, tabId: any) => {
   try {
     let userIdentity = !token.value ? userId.value : null;
-    if (credits.value <= 0)
-      return "You have no credits left, please upgrade your plan.";
+    if (credits.value <= 0) {
+      let botMessage = {
+        update: false,
+        loading: false,
+        senderId: null,
+        messages: [
+          {
+            message: "You have no credits left, please upgrade your plan.",
+            time: new Date().getTime(),
+          },
+        ],
+      };
 
-    if (message) {
-      const data = await fetch(`${webUrl}/api/v1/message`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          authorization: `Bearer ${token.value}`,
+      // If stream is supported, push the response to the stream
+      await sendMessage(
+        "app-message",
+        { appMessages: botMessage },
+        { context: "content-script", tabId }
+      );
+
+      return;
+    }
+
+    if (!message) return "Please enter a message.";
+
+    const data = await fetch(`${webUrl}/api/v1/message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+      body: JSON.stringify({
+        message,
+        user_identity: userIdentity,
+        metadata,
+      }),
+    });
+
+    console.log("🚀 ~ file: main.ts:297 ~ callGPTMessage ~ data:", data);
+
+    credits.value = credits.value - 1;
+
+    let botMessage = {
+      update: false,
+      loading: true,
+      senderId: null,
+      messages: [
+        {
+          message: "Loading...",
+          time: new Date().getTime(),
         },
-        body: JSON.stringify({
-          message,
-          user_identity: userIdentity,
-          metadata,
-        }),
-      });
+      ],
+    };
 
-      credits.value = credits.value - 1;
+    // If stream is supported, push the response to the stream
+    await sendMessage(
+      "app-message",
+      { appMessages: botMessage },
+      { context: "content-script", tabId }
+    );
 
-      let response = await data.json();
+    const transferEncoding = data.headers.get("Transfer-Encoding");
+    const contentLength = data.headers.get("Content-Length");
 
-      return response?.data?.message || "";
+    const isMissingContentLength =
+      !contentLength || parseInt(contentLength) > 1000000; // Adjust the threshold as needed
+
+    if (
+      (transferEncoding && transferEncoding.toLowerCase() === "chunked") ||
+      isMissingContentLength
+    ) {
+      botMessage.update = true;
+
+      const reader = data.body.getReader();
+
+      // Start reading the stream and processing its content
+      let responseString = "";
+      let chunks = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        console.log("🚀 ~ file: main.ts:369 ~ callGPTMessage ~ value:", value);
+
+        // When the stream is fully consumed, done will be true
+        if (done) {
+          botMessage.loading = false;
+          await sendMessage(
+            "app-message",
+            { appMessages: botMessage },
+            { context: "content-script", tabId }
+          );
+
+          break;
+        }
+
+        // For the sake of this example, we convert each chunk to text and log it
+        if (value) {
+          let streamData = new TextDecoder("utf-8").decode(value);
+          if (!streamData) return;
+
+          responseString += streamData.toString();
+          botMessage.messages[0].message = responseString;
+
+          await sendMessage(
+            "app-message",
+            { appMessages: botMessage },
+            { context: "content-script", tabId }
+          );
+        }
+      }
+
+      return responseString;
+    } else {
+      const response = await data.json();
+
+      botMessage.loading = false;
+      botMessage.update = true;
+      botMessage.messages[0].message = response?.data?.message || "";
+
+      await sendMessage(
+        "app-message",
+        { appMessages: botMessage },
+        { context: "content-script", tabId }
+      );
+
+      if (response?.data?.message) {
+        return response?.data?.message || "";
+      }
+
+      // Return the entire content (concatenated chunks)
+      // return chunks.join("");
+
+      // return response?.data?.message || "";
     }
   } catch (error) {
+    console.log(error);
+    let botMessage = {
+      update: true,
+      loading: false,
+      senderId: null,
+      messages: [
+        {
+          message: "Failed to get response, try again later",
+          time: new Date().getTime(),
+        },
+      ],
+    };
+
+    await sendMessage(
+      "app-message",
+      { appMessages: botMessage },
+      { context: "content-script", tabId }
+    );
+
     return "Failed to get response, try again later.";
   }
 };

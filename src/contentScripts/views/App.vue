@@ -275,16 +275,29 @@ onMessage("toggle-chat", (_) => {
 
 onMessage("app-message", (message) => {
   toggle(true);
-  messageData.value.push(message.data?.appMessages);
-  isLoading.value = !isLoading.value;
 
-  chatContainer.scrollTop = chatContainer?.scrollHeight;
+  if (message?.data?.appMessages?.update === true) {
+    // Get last messageData index where appMessages senderId is null
+    const lastMessageIndex = messageData.value
+      .map((msg) => msg.senderId)
+      .lastIndexOf(null);
+
+    // Replace messages[0].messages
+    messageData.value[lastMessageIndex].messages[0] =
+      message.data?.appMessages?.messages[0];
+  } else {
+    messageData.value.push(message.data?.appMessages);
+  }
+
+  isLoading.value = message.data?.appMessages?.loading;
+
+  if (chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+  }
 });
 
 onMessage("tab-updated", (message) => {
-  console.log("🚀 ~ file: App.vue:285 ~ onMessage ~ message:", message);
   if (message?.data?.changeInfo?.status === "complete") {
-    console.log("🚀 ~ file: App.vue:287 ~ onMessage ~ trigger:");
     // set a delay of 2 second then trigger the function
     addHoverStyles();
     setTimeout(() => {
@@ -295,6 +308,8 @@ onMessage("tab-updated", (message) => {
 
 const onSendClick = async () => {
   const message = questionInput.value;
+  console.log("🚀 ~ file: App.vue:311 ~ onSendClick ~ message:", message);
+
   if (!message) {
     return;
   }
@@ -305,7 +320,7 @@ const onSendClick = async () => {
       message,
       metadata: {
         current_website_url: window.location.href,
-        url_body_content: document.body.innerHTML,
+        url_body_content: document.body.innerText,
       },
     },
     "background"
@@ -447,6 +462,10 @@ const showToolbar = (event?: any, meta?: any) => {
   }
 };
 
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  return true;
+});
+
 document.addEventListener("mouseup", function () {
   showToolbar();
 });
@@ -510,7 +529,6 @@ const setMessages = () => {
 const renderImageIconButton = () => {
   // Get all images in the document
   const images = document.querySelectorAll("img");
-  console.log(images);
 
   images.forEach((img) => {
     // Check if image is greater than 100px in width or height
@@ -568,6 +586,13 @@ const addHoverStyles = () => {
   document.head.appendChild(style);
 };
 
+const handleZoomChange = () => {
+  // Handle zoom change by adjusting startX and startY
+  const zoomLevel = window.devicePixelRatio || 1;
+  startX *= zoomLevel;
+  startY *= zoomLevel;
+};
+
 onMounted(() => {
   // getToken();
   getFontSize();
@@ -577,6 +602,7 @@ onMounted(() => {
   // onSettingsInit();
   // getCurrentCredits();
   document.addEventListener("mousedown", handleOutsideClick);
+  window.addEventListener("resize", handleZoomChange);
 });
 
 onBeforeUnmount(() => {
@@ -597,7 +623,7 @@ onBeforeUnmount(() => {
             : 'absolute !important'
         }`,
       }"
-      style="z-index: 9999999999"
+      style="z-index: 9999999999; background-color: white"
       class="popup border border-gray-300 shadow-md rounded-lg flex p-1"
     >
       <!-- Add toolbar buttons or items here -->
@@ -818,155 +844,6 @@ onBeforeUnmount(() => {
       :style="{ right: `${right}px`, bottom: `${bottom}px` }"
       class="fixed flex right-0 bottom-0 m-5 z-100 flex items-end font-sans leading-1em"
     >
-      <!-- <div
-        v-show="show && !isSidebar"
-        id="popover"
-        ref="popover"
-        class="flex flex-col bg-white text-gray-800 rounded-lg shadow-lg w-max h-min m-2"
-        m="y-auto r-2"
-        style="width: 320px; min-height: 300px; max-height: 600px"
-        transition="opacity duration-300"
-        :class="show ? 'opacity-100' : 'opacity-0'"
-      >
-        <div
-          v-if="messageData.length > 0"
-          ref="chatContainer"
-          class="flex-grow overflow-y-auto rounded-lg"
-        >
-          <div
-            v-for="(msgGrp, index) in messageData"
-            :key="index"
-            style="border-bottom: 1px solid rgb(235, 234, 226)"
-            class="chat-group d-flex align-start pa-1"
-            :class="
-              msgGrp.senderId ? 'sender-msg-container' : 'bot-msg-container'
-            "
-          >
-            <div
-              v-for="(msgData, msgIndex) in msgGrp.messages"
-              :key="msgIndex"
-              class="chat-font ml-1"
-              :class="[
-                msgGrp?.messages.length - 1 !== msgIndex ? 'mb-3' : 'mb-1',
-              ]"
-              :style="`font-size: ${settings.fontSize}px`"
-            >
-              <pre
-                class="formatted-text my-0"
-                :style="`font-size: ${settings.fontSize}px`"
-                v-html="formattedText(msgData?.message)"
-              ></pre>
-              <p
-                v-if="isCopiedTriggered === -1 || isCopiedTriggered !== index"
-                class="text-blue-600 hover:text-blue-800 underline text-xs my-0 cursor-pointer"
-                style="font-size: 8px"
-                @click="copyMessage(msgData?.message, index)"
-              >
-                Copy
-              </p>
-              <p
-                v-else-if="isCopiedTriggered === index"
-                class="italic my-0"
-                :style="`font-size: ${settings.fontSize}px`"
-              >
-                Copied
-              </p>
-            </div>
-          </div>
-        </div>
-        <div
-          v-else
-          class="flex-grow overflow-y-auto rounded-lg p-2 space-y-2 text-primary"
-        >
-          <div class="text-xl">Welcome to Respond Buddy! 👋</div>
-          <div :style="`font-size: ${settings.fontSize}px; line-height: 24px`">
-            Ready to try it? 🤔
-            <br />
-            <br />
-            Right-click on any text in your browser 🖱️, choose from options like
-            'Summarize,' 'Simplify,' or 'Expand.'
-            <br />
-            <br />
-            Or start by asking a question at the bottom in the chat box. 📝
-            <br />
-            <br />
-            If you love it, signup or login 😍
-          </div>
-          <div class="flex gap-2 mt-2">
-            <button
-              @click="onClickLoginRegister"
-              type="button"
-              class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-sm px-5 py-2 text-center mr-2 mb-2 border-none"
-            >
-              Login / Register
-            </button>
-          </div>
-          <div :style="`font-size: ${settings.fontSize}px`">
-            Please share it with your friends! 🙏
-          </div>
-          <div class="flex gap-1 border-none">
-            <button
-              v-for="social in socialMediaContents"
-              class="py-2 bg-transparent border-none hover:text-gray-300 cursor-pointer hover:shadow-lg rounded-full active:scale-95 focus:outline-none"
-              @click="shareToSocialMedia(social.type)"
-            >
-              <img class="w-5 h-5" :src="social.icon" />
-            </button>
-          </div>
-        </div>
-        <div
-          class="flex relative w-full bg-white-100 border-t-1 border-slate-400"
-          style="border-top: solid; border-width: 1px; border-color: #cfd8dc"
-        >
-          <textarea
-            v-model="questionInput"
-            :disabled="isLoading"
-            ref="messageInput"
-            type="search"
-            id="message-input"
-            :class="isLoading ? 'cursor-wait' : ''"
-            class="block w-full m-2 z-20 text-sm text-slate-900 font-sans overflow-y-auto"
-            rows="1"
-            style="
-              background: transparent;
-              border: none;
-              outline: none;
-              resize: none;
-            "
-            :placeholder="!isLoading ? 'Ask a question...' : 'Loading...'"
-            required
-            @input="adjustHeight"
-          />
-          <button
-            v-if="!isLoading"
-            class="flex bg-white cursor-pointer border-none items-center justify-center mx-2 active:scale-95 focus:outline-none"
-            @click="onSendClick"
-          >
-            <img
-              src="/assets/tabler-send.svg"
-              class="text-slate-700 text-lg w-4 h-4 focus:text-blue-500 hover:text-blue-300"
-            />
-          </button>
-          <button v-else type="button" class="bg-white border-none" disabled>
-            <svg
-              aria-hidden="true"
-              class="inline w-4 h-4 mr-2 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
-              viewBox="0 0 100 101"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
-                fill="currentColor"
-              />
-              <path
-                d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
-                fill="currentFill"
-              />
-            </svg>
-          </button>
-        </div>
-      </div> -->
       <button
         class="flex rounded-full cursor-pointer border-none bg-transparent"
         id="respond-buddy-fba-button"
@@ -974,19 +851,6 @@ onBeforeUnmount(() => {
         @mousedown.prevent="dragStart"
         @click.stop="toggle()"
       >
-        <!-- <div
-          v-if="!show"
-          class="absolute shadow-xl top-0 right-0 bg-red-500 rounded-full text-white h-5 w-5 flex items-center justify-center"
-          style="
-            font-size: 10px;
-            font-weight: 600;
-            line-height: 1;
-            margin-top: -1px;
-            margin-right: 1px;
-          "
-        >
-          {{ credits }}
-        </div> -->
         <img
           src="/assets/rb-icon-2.png"
           class="text-lg"
@@ -1075,8 +939,8 @@ onBeforeUnmount(() => {
 .overlay {
   position: fixed;
   top: 0;
-  left: 75%;
-  width: calc(100% - 75%);
+  right: 0;
+  width: 500px;
   height: 100%;
   z-index: 9999;
   display: flex;
