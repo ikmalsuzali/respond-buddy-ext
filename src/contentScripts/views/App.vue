@@ -15,6 +15,7 @@ import messageQuestionSvg from "../../assets/message-question.svg";
 import oneTwoThreeSvg from "../../assets/onetwothree.svg";
 
 const [show, toggle] = useToggle(false);
+const sidebar = ref(null);
 const isLoading = ref(false);
 const messageInput = ref(null);
 const popover = ref(null);
@@ -28,6 +29,9 @@ const settings = ref({
   fontSize: 12,
 });
 const token = ref("");
+const isSidebarDragging = ref(false);
+const sidebarStartX = ref(0);
+const sidebarWidth = ref(300);
 
 const right = ref(0);
 const bottom = ref(45);
@@ -125,6 +129,39 @@ let toolbarItems = ref([
   //   template: "Others:",
   // },
 ]);
+let prompts = ref([
+  {
+    name: "Summarize this page",
+    key: "summarize-page",
+    action: () => {
+      updateInput("Summarize this page");
+      onSendClick();
+    },
+  },
+  {
+    name: "Expand this statement:",
+    key: "expand",
+    action: () => {
+      updateInput("Expand this statement:");
+    },
+  },
+  {
+    name: "Who is the possible audience",
+    key: "audience-finder",
+    action: () => {
+      updateInput("Who is the possible audience");
+      onSendClick();
+    },
+  },
+  {
+    name: "Organize this into a list",
+    key: "organize-list",
+    action: () => {
+      updateInput("Organize this into a list");
+      onSendClick();
+    },
+  },
+]);
 
 const formattedText = (text: string) => {
   if (text?.includes("\n") || text?.includes("```")) {
@@ -162,12 +199,33 @@ const onClickToolbarItem = async (index: any) => {
   });
 };
 
+const startSidebarDrag = (event: any) => {
+  isSidebarDragging.value = true;
+  sidebarStartX.value = event.clientX;
+  sidebarWidth.value = sidebar.value?.offsetWidth;
+};
+
+const stopSidebarDrag = () => {
+  isSidebarDragging.value = false;
+};
+
 const onMouseEnterToolbarItem = (index: any) => {
   toolbarItems.value[index].isHovered = true;
 };
 
 const onMouseLeaveToolbarItem = (index: any) => {
   toolbarItems.value[index].isHovered = false;
+};
+
+const handleMouseMove = (event) => {
+  if (isSidebarDragging.value) {
+    const diffX = event.clientX - sidebarStartX.value;
+    const newWidth = sidebarWidth.value - diffX;
+
+    if (newWidth >= 300 && newWidth <= 1000) {
+      sidebar.value.style.width = `${newWidth}px`;
+    }
+  }
 };
 
 let socialMediaShareMessage = ref([
@@ -305,6 +363,10 @@ onMessage("tab-updated", (message) => {
     }, 2000);
   }
 });
+
+const updateInput = (value: string) => {
+  questionInput.value = value;
+};
 
 const onSendClick = async () => {
   const message = questionInput.value;
@@ -593,7 +655,7 @@ const handleZoomChange = () => {
 };
 
 onMounted(() => {
-  // getToken();
+  getToken();
   getFontSize();
   getChatButtonPosition();
   // addHoverStyles();
@@ -602,10 +664,14 @@ onMounted(() => {
   // getCurrentCredits();
   document.addEventListener("mousedown", handleOutsideClick);
   window.addEventListener("resize", handleZoomChange);
+  document.addEventListener("mousemove", handleMouseMove);
+  document.addEventListener("mouseup", stopSidebarDrag);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("mousedown", handleOutsideClick);
+  document.removeEventListener("mousemove", handleMouseMove);
+  document.removeEventListener("mouseup", stopSidebarDrag);
 });
 </script>
 
@@ -666,13 +732,18 @@ onBeforeUnmount(() => {
         </div>
       </button>
     </div>
-    <div v-show="show && isSidebar" class="overlay">
+    <div v-show="show && isSidebar" class="overlay" ref="sidebar">
       <div
         class="sidebar flex flex-col"
         @click.stop
         @keydown.stop
         @keypress.stop
       >
+        <div
+          class="drag-icon"
+          @mousedown.prevent="startSidebarDrag"
+          @mouseup.prevent="stopSidebarDrag"
+        ></div>
         <div
           v-if="messageData.length > 0"
           ref="chatContainer"
@@ -690,7 +761,7 @@ onBeforeUnmount(() => {
             <div
               v-for="(msgData, msgIndex) in msgGrp.messages"
               :key="msgIndex"
-              class="chat-font ml-1"
+              class="chat-font ml-3"
               :class="[
                 msgGrp?.messages.length - 1 !== msgIndex ? 'mb-3' : 'mb-1',
               ]"
@@ -782,6 +853,23 @@ onBeforeUnmount(() => {
             >
               <img class="w-7 h-7" :src="social.icon" />
             </button>
+          </div>
+          <div class="bold" :style="`font-size: ${settings.fontSize + 1}px;`">
+            Start with these prompts 👋
+          </div>
+          <div>
+            <div class="flex flex mt-2" style="flex-wrap: wrap">
+              <div v-for="prompt in prompts">
+                <button
+                  type="button"
+                  class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                  style="color: white"
+                  @click="prompt.action()"
+                >
+                  {{ prompt.name }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         <div
@@ -898,6 +986,18 @@ onBeforeUnmount(() => {
       border-start-start-radius: 6px;
     }
   }
+}
+
+.drag-icon {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  background-image: url("../../assets/drag.svg");
+  background-size: contain;
+  cursor: grab;
 }
 
 .chat-font {

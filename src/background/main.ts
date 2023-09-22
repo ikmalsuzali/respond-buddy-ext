@@ -1,4 +1,3 @@
-import { parse } from "node:path";
 import { onMessage, sendMessage } from "webext-bridge/background";
 import type { Tabs } from "webextension-polyfill";
 import { generateUUID } from "~/logic/helper";
@@ -7,7 +6,6 @@ import {
   token,
   userId,
   credits,
-  newCreditDate,
   fontSize,
   chatButtonPosition,
   templates,
@@ -312,21 +310,6 @@ const callGPTMessage = async (message: string, metadata: any, tabId: any) => {
 
     if (!message) return "Please enter a message.";
 
-    const data = await fetch(`${webUrl}/api/v1/message`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        authorization: `Bearer ${token.value}`,
-      },
-      body: JSON.stringify({
-        message,
-        user_identity: userIdentity,
-        metadata,
-      }),
-    });
-
-    credits.value = credits.value - 1;
-
     let botMessage = {
       update: false,
       loading: true,
@@ -345,6 +328,21 @@ const callGPTMessage = async (message: string, metadata: any, tabId: any) => {
       { appMessages: botMessage },
       { context: "content-script", tabId }
     );
+
+    const data = await fetch(`${webUrl}/api/v1/message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+      body: JSON.stringify({
+        message,
+        user_identity: userIdentity,
+        metadata,
+      }),
+    });
+
+    credits.value = credits.value - 1;
 
     const transferEncoding = data.headers.get("Transfer-Encoding");
     const contentLength = data.headers.get("Content-Length");
