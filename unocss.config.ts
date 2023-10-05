@@ -1,12 +1,12 @@
 import { defineConfig } from "unocss/vite";
 import {
+  presetWind,
   presetAttributify,
   presetIcons,
-  presetWind,
   transformerDirectives,
 } from "unocss";
 
 export default defineConfig({
-  presets: [presetWind(), presetAttributify(), presetIcons()],
-  transformers: [transformerDirectives()],
+  presets: [],
+  transformers: [],
 });

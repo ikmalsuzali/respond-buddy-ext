@@ -8,6 +8,7 @@ import {
   userId,
   messages,
   token,
+  templates,
 } from "~/logic/storage";
 
 const onResetClick = () => {
@@ -23,6 +24,7 @@ const onResetAllData = () => {
   userId.value = "";
   messages.value = [];
   token.value = "";
+  templates.value = [];
 };
 
 const onSettingsChange = () => {
@@ -109,6 +111,7 @@ const onSettingsChange = () => {
       <div>User id {{ userId }}</div>
       <div>Messages {{ messages }}</div>
       <div>Token {{ token }}</div>
+      <div>Templates {{ templates }}</div>
     </div>
   </main>
 </template>

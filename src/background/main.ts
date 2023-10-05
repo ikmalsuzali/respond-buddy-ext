@@ -11,8 +11,8 @@ import {
   templates,
 } from "~/logic/storage";
 
-let webUrl = "https://api.respondbuddy.com";
-// let webUrl = "http://0.0.0.0:8080";
+// let webUrl = "https://api.respondbuddy.com";
+let webUrl = "http://0.0.0.0:8080";
 
 // only on dev mode
 if (import.meta.hot) {
@@ -72,6 +72,8 @@ browser.runtime.onInstalled.addListener((): void => {
     title: "Custom Response",
     contexts: ["selection"],
   });
+
+  templatesInit();
 });
 
 let previousTabId = 0;
@@ -246,18 +248,19 @@ const processMessage = async (message: string, tabId: number, metadata: {}) => {
 //   );
 // });
 const templatesInit = async () => {
-  if (!token.value) return token.value;
   try {
     const data = await fetch(`${webUrl}/api/v1/tags`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        authorization: `Bearer ${token.value}`,
       },
     });
 
-    if (!data || data.length === 0) return;
-    templates.value = templates;
+    let response = await data.json();
+
+    if (!response.data || response?.data.length === 0) return;
+    console.log(response?.data);
+    templates.value = response?.data || [];
   } catch (error) {}
 };
 
@@ -585,4 +588,15 @@ onMessage("get-messages", () => {
 
 onMessage("set-messages", (message) => {
   messages.value = message.data?.messages;
+});
+
+// Templates
+onMessage("get-templates", () => {
+  if (templates.value.length > 0) return templates.value;
+  templatesInit();
+  return templates.value;
+});
+
+onMessage("set-templates", (templates) => {
+  templatesInit();
 });

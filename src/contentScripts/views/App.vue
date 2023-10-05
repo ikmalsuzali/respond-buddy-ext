@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import "../../styles/main.css";
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useToggle } from "@vueuse/core";
 import { onMessage, sendMessage } from "webext-bridge/content-script";
-import "uno.css";
+// import "uno.css";
 import facebookSvg from "../../assets/facebook-svgrepo.svg";
 import twitterSvg from "../../assets/twitter-svgrepo.svg";
 import linkedinSvg from "../../assets/linkedin-svgrepo.svg";
@@ -13,7 +14,23 @@ import fileInfoSvg from "../../assets/file-info.svg";
 import languageSvg from "../../assets/language.svg";
 import messageQuestionSvg from "../../assets/message-question.svg";
 import oneTwoThreeSvg from "../../assets/onetwothree.svg";
+import Combobox from "./ComboBox.vue";
 
+const webConfig = ref([
+  {
+    website: "Medium",
+    matchUrl: "medium.com/",
+    selector: "section",
+    actions: ["summarize-web"],
+    style: {
+      "text-align": "center",
+      padding: "20px",
+      "margin-bottom": "-25px",
+    },
+  },
+  // ...other objects for different websites or conditions
+]);
+const currentConfig = ref({});
 const [show, toggle] = useToggle(false);
 const sidebar = ref(null);
 const isLoading = ref(false);
@@ -129,6 +146,9 @@ let toolbarItems = ref([
   //   template: "Others:",
   // },
 ]);
+let teleportTarget = ref("body");
+
+console.log("hello");
 let prompts = ref([
   {
     name: "Summarize this page",
@@ -395,6 +415,12 @@ const onSendClick = async () => {
 };
 
 const handleOutsideClick = (event) => {
+  console.log("handle outside click");
+  if (!selectedText.value || selectedText.value === "") {
+    console.log('handle outside click, selectedText.value === "');
+    isSelectionShow.value = false;
+  }
+
   if (
     event?.target &&
     (event?.target.id === "respond-buddy" ||
@@ -470,6 +496,10 @@ const onClickToolbarOption = async (message: string) => {
 const showToolbar = (event?: any, meta?: any) => {
   if (show.value) return;
   const selection = window.getSelection();
+  if (!selection?.toString().trim()) {
+    isSelectionShow.value = false;
+    return;
+  }
   selectedText.value = selection?.toString().trim();
   if (selectedText.value.length > 0) {
     popoverType.value = "selection";
@@ -517,9 +547,9 @@ const showToolbar = (event?: any, meta?: any) => {
       );
 
       isSelectionShow.value = true;
-    } else {
-      isSelectionShow.value = false;
     }
+
+    isSelectionShow.value = false;
   }
 };
 
@@ -527,13 +557,34 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-document.addEventListener("mouseup", function () {
-  showToolbar();
-});
-
 const getToken = () => {
   sendMessage("get-token", {}, "background").then((response) => {
     token.value = response || "";
+  });
+};
+
+const getTemplates = () => {
+  sendMessage("get-templates", {}, "background").then((response) => {
+    console.log(response);
+    // prompts.value = response
+    let templates = response || [];
+    if (templates?.length === 0) {
+      return;
+    }
+    prompts.value = templates?.map((template: any) => {
+      return {
+        name: template?.name,
+        key: template?.key,
+        action: () => {
+          updateInput(template?.base_message[0]);
+          if (!template?.ai_template) {
+            onSendClick();
+          }
+        },
+      };
+    });
+
+    console.log(prompts.value);
   });
 };
 
@@ -658,6 +709,7 @@ onMounted(() => {
   getToken();
   getFontSize();
   getChatButtonPosition();
+  getTemplates();
   // addHoverStyles();
   // renderImageIconButton();
   // onSettingsInit();
@@ -666,6 +718,69 @@ onMounted(() => {
   window.addEventListener("resize", handleZoomChange);
   document.addEventListener("mousemove", handleMouseMove);
   document.addEventListener("mouseup", stopSidebarDrag);
+  document.addEventListener("mouseup", () => {
+    showToolbar();
+  });
+
+  document.addEventListener("input", () => {
+    selectedText.value = "";
+    isSelectionShow.value = false;
+  });
+
+  webConfig.value?.forEach((config: any) => {
+    if (window.location.href.includes(config.matchUrl)) {
+      let configElement = document.querySelector(config.selector);
+      currentConfig.value = config;
+      if (configElement) {
+        teleportTarget.value = document.createElement("div");
+        configElement.insertBefore(
+          teleportTarget.value,
+          configElement.firstChild
+        );
+      }
+    }
+  });
+
+  const promptTextarea = document.querySelector("#prompt-textarea");
+  console.log("prompt text area", promptTextarea);
+  const container = document.createElement("div");
+  container.style.display = "flex";
+  // promptTextarea.parentNode.insertBefore(container, promptTextarea);
+  const app = createApp(Combobox);
+  app.mount(container);
+  const button1 = document.createElement("button");
+  button1.textContent = "Button 1";
+  const button2 = document.createElement("button");
+  button2.textContent = "Button 2";
+  const button3 = document.createElement("button");
+  button3.textContent = "Button 3";
+  container.appendChild(button1);
+  container.appendChild(button2);
+  container.appendChild(button3);
+  promptTextarea.parentNode.insertBefore(container, promptTextarea);
+
+  // let configElement = document.querySelector("section");
+  // console.log(
+  //   "🚀 ~ file: App.vue:715 ~ onMounted ~ configElement:",
+  //   configElement
+  // );
+  // if (configElement) {
+  //   teleportTarget.value = document.createElement("div");
+  //   configElement.insertBefore(teleportTarget.value, configElement.firstChild);
+  // }
+
+  // document.addEventListener("DOMContentLoaded", () => {
+  //   // Use the configurable selector
+  //   console.log("DOMContentLoaded");
+  //   let configElement = document.querySelector("section");
+  //   console.log(configElement);
+  //   if (configElement) {
+  //     let currentUrl = window.location.href;
+  //     if (currentUrl.includes("medium.com/")) {
+  //       console.log(window.location.href);
+  //     }
+  //   }
+  // });
 });
 
 onBeforeUnmount(() => {
@@ -677,6 +792,11 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
+    <teleport :to="teleportTarget">
+      <div v-if="teleportTarget !== 'body'" :style="currentConfig?.style || {}">
+        <h1>Hello from the other side</h1>
+      </div>
+    </teleport>
     <div
       v-if="isSelectionShow"
       :style="{
@@ -855,7 +975,7 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <div class="bold" :style="`font-size: ${settings.fontSize + 1}px;`">
-            Start with these prompts 👋
+            Start with these prompts 🚀
           </div>
           <div>
             <div class="flex flex mt-2" style="flex-wrap: wrap">
