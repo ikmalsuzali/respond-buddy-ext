@@ -44,7 +44,11 @@ export async function getManifest() {
     ],
     web_accessible_resources: [
       {
-        resources: ["dist/contentScripts/style.css", "assets/rb-icon.png"],
+        resources: [
+          "dist/contentScripts/style.css",
+          "assets/rb-icon.png",
+          "assets/blue-bg-home.jpg",
+        ],
         matches: ["<all_urls>"],
       },
     ],

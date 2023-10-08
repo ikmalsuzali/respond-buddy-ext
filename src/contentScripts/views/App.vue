@@ -14,7 +14,121 @@ import fileInfoSvg from "../../assets/file-info.svg";
 import languageSvg from "../../assets/language.svg";
 import messageQuestionSvg from "../../assets/message-question.svg";
 import oneTwoThreeSvg from "../../assets/onetwothree.svg";
-import Combobox from "./ComboBox.vue";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EyeIcon,
+  PaperAirplaneIcon,
+  PlusIcon,
+  XMarkIcon,
+} from "@heroicons/vue/24/solid";
+import {
+  HeartIcon as HeartOutlineIcon,
+  ChartBarIcon,
+} from "@heroicons/vue/24/outline";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxLabel,
+  ListboxOption,
+  ListboxOptions,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItems,
+} from "@headlessui/vue";
+import { CheckIcon, ChevronDownIcon } from "@heroicons/vue/20/solid";
+
+const publishingOptions = [
+  {
+    title: "Published",
+    description: "This job posting can be viewed by anyone who has the link.",
+    current: true,
+  },
+  {
+    title: "Draft",
+    description: "This job posting will no longer be publicly accessible.",
+    current: false,
+  },
+];
+
+const sortByMenuItems = ref([
+  {
+    name: "Top usage",
+    current: false,
+    key: "top_usage",
+  },
+  {
+    name: "Top trending",
+    current: false,
+    key: "top_trending",
+  },
+  {
+    name: "Private",
+    current: false,
+    key: "private",
+  },
+  {
+    name: "Relevance",
+    current: false,
+    key: "relevance",
+  },
+  {
+    name: "Latest update",
+    current: false,
+    key: "latest_update",
+  },
+]);
+
+const currentSortByItem = ref(sortByMenuItems.value[0]);
+const onSortByMenuItemClick = (item: any) => {
+  currentSortByItem.value = item;
+};
+
+const categoryItems = [
+  {
+    name: "Use Cases",
+    current: false,
+    key: "",
+  },
+  {
+    name: "Marketing",
+    current: false,
+    key: "marketing",
+  },
+  {
+    name: "Students",
+    current: false,
+    key: "students",
+  },
+  {
+    name: "Finance",
+    current: false,
+    key: "finance",
+  },
+  {
+    name: "Software Engineering",
+    current: false,
+    key: "software_engineering",
+  },
+];
+
+const currentCategoryItem = ref(categoryItems[0]);
+const onFilterCategoryItem = (item: any) => {
+  currentCategoryItem.value = item;
+};
+
+const selected = ref(publishingOptions[0]);
+
+import {
+  TabGroup,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel,
+  TransitionChild,
+  TransitionRoot,
+} from "@headlessui/vue";
 
 const webConfig = ref([
   {
@@ -45,13 +159,29 @@ const popoverType = ref("selection");
 const settings = ref({
   fontSize: 12,
 });
+let homeBackgroundUrl = browser.runtime.getURL("assets/blue-bg-home.jpg");
 const token = ref("");
 const isSidebarDragging = ref(false);
 const sidebarStartX = ref(0);
 const sidebarWidth = ref(300);
+const sidebarTabHeaders = ref([
+  {
+    name: "Home",
+    key: "home",
+  },
+  {
+    name: "Prompts",
+    key: "prompts",
+  },
+  {
+    name: "Chat",
+    key: "chat",
+  },
+]);
 
 const right = ref(0);
 const bottom = ref(45);
+const sidebarKey = ref(0);
 
 let startX = 0;
 let startY = 0;
@@ -109,7 +239,7 @@ let toolbarItems = ref([
       // {
       //   key: "chinese",
       //   name: "Chinese",
-      //   template: "Translate to Chinese: ",
+      //   template: "Translate to Cfhinese: ",
       // },
     ],
     isHovered: false,
@@ -220,9 +350,19 @@ const onClickToolbarItem = async (index: any) => {
 };
 
 const startSidebarDrag = (event: any) => {
+  sidebarKey.value += 1;
+  console.log("sidebar", sidebar.value);
   isSidebarDragging.value = true;
   sidebarStartX.value = event.clientX;
+  console.log(
+    "🚀 ~ file: App.vue:248 ~ startSidebarDrag ~ event.clientX:",
+    event
+  );
   sidebarWidth.value = sidebar.value?.offsetWidth;
+  console.log(
+    "🚀 ~ file: App.vue:250 ~ startSidebarDrag ~ sidebar.value?.offsetWidth:",
+    sidebar.value?.offsetWidth
+  );
 };
 
 const stopSidebarDrag = () => {
@@ -340,6 +480,10 @@ const shareToSocialMedia = (platform: string, content?: any = {}) => {
 
   // Open the share URL in a new window
   window.open(shareUrl, "_blank");
+};
+
+const onHeartClick = (prompt) => {
+  prompt.isLiked = !prompt.isLiked;
 };
 
 const onDashboardClick = () => {
@@ -575,6 +719,7 @@ const getTemplates = () => {
       return {
         name: template?.name,
         key: template?.key,
+        isLiked: template?.is_liked || false,
         action: () => {
           updateInput(template?.base_message[0]);
           if (!template?.ai_template) {
@@ -741,23 +886,23 @@ onMounted(() => {
     }
   });
 
-  const promptTextarea = document.querySelector("#prompt-textarea");
-  console.log("prompt text area", promptTextarea);
-  const container = document.createElement("div");
-  container.style.display = "flex";
+  // const promptTextarea = document.querySelector("#prompt-textarea");
+  // console.log("prompt text area", promptTextarea);
+  // const container = document.createElement("div");
+  // container.style.display = "flex";
+  // // promptTextarea.parentNode.insertBefore(container, promptTextarea);
+  // const app = createApp(Combobox);
+  // app.mount(container);
+  // const button1 = document.createElement("button");
+  // button1.textContent = "Button 1";
+  // const button2 = document.createElement("button");
+  // button2.textContent = "Button 2";
+  // const button3 = document.createElement("button");
+  // button3.textContent = "Button 3";
+  // container.appendChild(button1);
+  // container.appendChild(button2);
+  // container.appendChild(button3);
   // promptTextarea.parentNode.insertBefore(container, promptTextarea);
-  const app = createApp(Combobox);
-  app.mount(container);
-  const button1 = document.createElement("button");
-  button1.textContent = "Button 1";
-  const button2 = document.createElement("button");
-  button2.textContent = "Button 2";
-  const button3 = document.createElement("button");
-  button3.textContent = "Button 3";
-  container.appendChild(button1);
-  container.appendChild(button2);
-  container.appendChild(button3);
-  promptTextarea.parentNode.insertBefore(container, promptTextarea);
 
   // let configElement = document.querySelector("section");
   // console.log(
@@ -852,201 +997,565 @@ onBeforeUnmount(() => {
         </div>
       </button>
     </div>
-    <div v-show="show && isSidebar" class="overlay" ref="sidebar">
-      <div
-        class="sidebar flex flex-col"
-        @click.stop
-        @keydown.stop
-        @keypress.stop
+    <TransitionRoot as="template" :show="show && isSidebar">
+      <TransitionChild
+        class="overlay"
+        ref="sidebar"
+        :key="sidebarKey"
+        as="div"
+        enter="transform transition ease-in-out duration-500 sm:duration-700"
+        enter-from="translate-x-full"
+        enter-to="translate-x-0"
+        leave="transform transition ease-in-out duration-500 sm:duration-700"
+        leave-from="translate-x-0"
+        leave-to="translate-x-full"
       >
         <div
-          class="drag-icon"
-          @mousedown.prevent="startSidebarDrag"
-          @mouseup.prevent="stopSidebarDrag"
-        ></div>
-        <div
-          v-if="messageData.length > 0"
-          ref="chatContainer"
-          class="flex-grow overflow-y-auto rounded-lg"
+          class="sidebar flex flex-col"
+          @click.stop
+          @keydown.stop
+          @keypress.stop
         >
           <div
-            v-for="(msgGrp, index) in messageData"
-            :key="index"
-            style="border-bottom: 1px solid rgb(235, 234, 226); padding: 10px"
-            class="chat-group d-flex align-start"
-            :class="
-              msgGrp.senderId ? 'sender-msg-container' : 'bot-msg-container'
-            "
+            class="drag-icon"
+            @mousedown.prevent="startSidebarDrag"
+            @mouseup.prevent="stopSidebarDrag"
+          ></div>
+
+          <div class="w-full h-full px-2 sm:px-0 self-center">
+            <TabGroup>
+              <TabPanels class="">
+                <TabPanel :key="0">
+                  <div
+                    class="realtive sticky top-0 w-full rounded-b-3xl bg-center cursor-pointer object-cover z-10 shadow-lg gradient"
+                    :style="`background-image: linear-gradient(to bottom, rgba(245, 246, 252, 0.82), rgba(59,130,246, 0.89)), url(${homeBackgroundUrl})`"
+                  >
+                    <div
+                      class="pt-5 px-3 rounded-lg flex flex-col w-full text-white"
+                    >
+                      <div class="font-bold text-xl my-10">
+                        Welcome to Respond Buddy! 👋
+                      </div>
+                      <div class="text-md">
+                        Ready to try it? 🤔 Highlight on any text in your
+                        browser 🖱️, choose from options like 'Summarize,'
+                        'Simplify,' or 'Expand.'
+                        <br />
+                        Or start by asking a question at the bottom in the chat
+                        box. 📝
+                        <br />
+                      </div>
+                    </div>
+
+                    <div class="flex items-center justify-between px-3 z-10">
+                      <div class="relative w-full my-4">
+                        <input
+                          type="text"
+                          class="bg-purple-white shadow rounded-xl border-0 p-3 w-full bg-white"
+                          placeholder="Ask me anything"
+                        />
+                        <div
+                          class="absolute top-0 right-0 p-4 pr-3 text-purple-lighter"
+                        >
+                          <PaperAirplaneIcon
+                            class="h-5 w-5 fill-gray-400"
+                            aria-hidden="true"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    class="flex-grow overflow-y-auto rounded-lg px-5 space-y-2"
+                  >
+                    <div
+                      v-if="!token"
+                      class="flex flex-col gap-2 mt-2"
+                      :style="`font-size: ${settings.fontSize + 1}px;`"
+                    >
+                      <div>If you love it, signup or login 😍</div>
+                      <div class="flex">
+                        <button
+                          @click="onClickLoginRegister('login')"
+                          type="button"
+                          class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                          style="color: white"
+                        >
+                          Login
+                        </button>
+                        <button
+                          @click="onClickLoginRegister('register')"
+                          type="button"
+                          class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                          style="color: white"
+                        >
+                          Register
+                        </button>
+                      </div>
+                    </div>
+                    <div
+                      v-else
+                      class="flex flex-col gap-2 mt-3"
+                      :style="`font-size: ${settings.fontSize + 1}px;`"
+                    >
+                      <button
+                        @click="onDashboardClick"
+                        type="button"
+                        class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                        style="color: white"
+                      >
+                        Go to Dashboard
+                      </button>
+                    </div>
+                    <div class="text-lg font-bold">
+                      Please share it with your friends! 🙏
+                    </div>
+                    <div class="flex gap-2 border-none">
+                      <button
+                        v-for="social in socialMediaContents"
+                        class="p-2 bg-transparent border-none hover:text-gray-300 cursor-pointer hover:shadow-lg hover:rounded active:scale-95 focus:outline-none"
+                        @click="shareToSocialMedia(social.type)"
+                      >
+                        <img class="w-10 h-10" :src="social.icon" />
+                      </button>
+                    </div>
+                    <div class="text-lg font-bold">
+                      Start with these prompts 🚀
+                    </div>
+                    <div>
+                      <div class="flex mt-2" style="flex-wrap: wrap">
+                        <div v-for="prompt in prompts">
+                          <button
+                            type="button"
+                            class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                            style="color: white"
+                            @click="prompt.action()"
+                          >
+                            {{ prompt.name }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabPanel>
+                <TabPanel :key="1" class="flex flex-col">
+                  <div class="px-4 space-y-3 overflow-y-auto mb-14">
+                    <div class="flex my-4">
+                      <div class="font-bold text-xl w-full">Prompts</div>
+                      <Listbox as="div" v-model="selected">
+                        <ListboxLabel class="sr-only"
+                          >Create new prompt</ListboxLabel
+                        >
+                        <div class="relative">
+                          <div
+                            class="inline-flex divide-x divide-blue-500 rounded-md shadow-sm"
+                          >
+                            <div
+                              class="w-[140px] inline-flex items-center gap-x-1.5 rounded-md bg-blue-500 px-3 py-2 text-white shadow-sm cursor-pointer"
+                              @click.stop="onCreateNewPrompt"
+                            >
+                              <PlusIcon
+                                class="-ml-0.5 h-5 w-5 fill-white"
+                                aria-hidden="true"
+                              />
+                              <p class="text-sm font-semibold !text-white">
+                                {{ "New Prompt" }}
+                              </p>
+                            </div>
+                            <!-- <ListboxButton
+                              class="inline-flex items-center rounded-l-none rounded-r-md bg-blue-500 p-2 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-50"
+                            >
+                              <span class="sr-only">Button</span>
+                              <ChevronDownIcon
+                                class="h-5 w-5 !fill-white"
+                                aria-hidden="true"
+                              />
+                            </ListboxButton> -->
+                          </div>
+
+                          <!-- <transition
+                            leave-active-class="transition ease-in duration-100"
+                            leave-from-class="opacity-100"
+                            leave-to-class="opacity-0"
+                          >
+                            <ListboxOptions
+                              class="absolute right-0 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-200 overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                            >
+                              <ListboxOption
+                                as="template"
+                                v-for="option in publishingOptions"
+                                :key="option.title"
+                                :value="option"
+                                v-slot="{ active, selected }"
+                              >
+                                <li
+                                  :class="[
+                                    active
+                                      ? 'bg-blue-500 text-white'
+                                      : 'text-white',
+                                    'cursor-default select-none p-4 text-sm',
+                                  ]"
+                                >
+                                  <div class="flex flex-col">
+                                    <div class="flex justify-between">
+                                      <p
+                                        :class="
+                                          selected
+                                            ? 'font-semibold'
+                                            : 'font-normal'
+                                        "
+                                      >
+                                        {{ option.title }}
+                                      </p>
+                                      <span
+                                        v-if="selected"
+                                        :class="
+                                          active
+                                            ? 'text-white'
+                                            : 'text-blue-500'
+                                        "
+                                      >
+                                        <CheckIcon
+                                          class="h-5 w-5"
+                                          aria-hidden="true"
+                                        />
+                                      </span>
+                                    </div>
+                                    <p
+                                      :class="[
+                                        active
+                                          ? 'text-indigo-200'
+                                          : 'text-gray-500',
+                                        'mt-2',
+                                      ]"
+                                    >
+                                      {{ option.description }}
+                                    </p>
+                                  </div>
+                                </li>
+                              </ListboxOption>
+                            </ListboxOptions>
+                          </transition> -->
+                        </div>
+                      </Listbox>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        name="name"
+                        id="name"
+                        class="bg-white block w-full rounded-full border-0 px-4 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-blue-100 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                        placeholder="Search for prompt"
+                      />
+                    </div>
+                    <div class="flex gap-2">
+                      <Menu as="div" class="relative inline-block text-left">
+                        <div>
+                          <MenuButton
+                            class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-white px-2 py-1 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                          >
+                            {{ currentSortByItem.name }}
+                            <ChevronDownIcon
+                              class="-mr-1 h-5 w-5 text-gray-400"
+                              aria-hidden="true"
+                            />
+                          </MenuButton>
+                        </div>
+
+                        <transition
+                          enter-active-class="transition ease-out duration-100"
+                          enter-from-class="transform opacity-0 scale-95"
+                          enter-to-class="transform opacity-100 scale-100"
+                          leave-active-class="transition ease-in duration-75"
+                          leave-from-class="transform opacity-100 scale-100"
+                          leave-to-class="transform opacity-0 scale-95"
+                        >
+                          <MenuItems
+                            class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                          >
+                            <div class="py-1">
+                              <MenuItem
+                                v-for="item in sortByMenuItems"
+                                v-slot="{ active }"
+                              >
+                                <a
+                                  href="#"
+                                  :class="[
+                                    active
+                                      ? 'bg-gray-100 text-gray-900'
+                                      : 'text-gray-700',
+                                    'block px-4 py-2 text-sm',
+                                  ]"
+                                  @click="onSortByMenuItemClick(item)"
+                                  >{{ item.name }}</a
+                                >
+                              </MenuItem>
+                            </div>
+                          </MenuItems>
+                        </transition>
+                      </Menu>
+                      <Menu as="div" class="relative inline-block text-left">
+                        <div>
+                          <MenuButton
+                            class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-white px-2 py-1 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                          >
+                            {{ currentCategoryItem.name }}
+                            <ChevronDownIcon
+                              v-if="currentCategoryItem.key === ''"
+                              class="-mr-1 h-5 w-5 text-gray-400"
+                              aria-hidden="true"
+                            />
+                            <XMarkIcon
+                              v-else
+                              class="-mr-1 h-5 w-5 text-gray-400"
+                              aria-hidden="true"
+                              @click.stop="
+                                onFilterCategoryItem(categoryItems[0])
+                              "
+                            />
+                          </MenuButton>
+                        </div>
+
+                        <transition
+                          enter-active-class="transition ease-out duration-100"
+                          enter-from-class="transform opacity-0 scale-95"
+                          enter-to-class="transform opacity-100 scale-100"
+                          leave-active-class="transition ease-in duration-75"
+                          leave-from-class="transform opacity-100 scale-100"
+                          leave-to-class="transform opacity-0 scale-95"
+                        >
+                          <MenuItems
+                            class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                          >
+                            <div class="py-1">
+                              <MenuItem
+                                v-for="item in categoryItems"
+                                v-slot="{ active }"
+                              >
+                                <a
+                                  href="#"
+                                  :class="[
+                                    active
+                                      ? 'bg-gray-100 text-gray-900'
+                                      : 'text-gray-700',
+                                    'block px-4 py-2 text-sm',
+                                  ]"
+                                  @click="onFilterCategoryItem(item)"
+                                  >{{ item.name }}</a
+                                >
+                              </MenuItem>
+                            </div>
+                          </MenuItems>
+                        </transition>
+                      </Menu>
+                    </div>
+                    <div class="cursor-pointer" v-for="prompt in prompts">
+                      <div
+                        class="bg-slate-200 rounded-xl shadow-md max-w-lg flex items-center justify-between px-4 py-2"
+                      >
+                        <div class="flex items-center space-x-2">
+                          <!-- <div class="bg-orange-500 p-2 rounded-full">
+                        <img class="h-6 w-6" alt="Icon" />
+                      </div> -->
+                          <div class="space-y-1">
+                            <h2 class="text-lg">{{ prompt.name }}</h2>
+                            <div
+                              class="text-sm font-light text-gray-600 space-x-2 line-clamp-3 leading-5"
+                            >
+                              {{
+                                prompt?.used_description ||
+                                "The sun dipped below the horizon, casting a warm, golden glow across the tranquil lake. The gentle ripples on the water's surface mirrored the fading colors of the sky, creating a breathtaking panorama. As the stars began to emerge one by one, the world around me grew quiet, and I couldn't help but feel a sense of peace and wonder. Nature's beauty never ceased to amaze, reminding me of the simple joys that life has to offer"
+                              }}
+                            </div>
+                            <div
+                              class="flex text-sm font-light text-gray-600 space-x-2"
+                            >
+                              <p class="text-gray-600">Text Generation</p>
+
+                              <div class="flex gap-1">
+                                <ChartBarIcon class="w-5 hover:fill-grey-500" />
+                                55.4k
+                              </div>
+                              <div class="flex gap-1">
+                                <HeartOutlineIcon
+                                  v-if="!prompt?.isLiked"
+                                  @click="onHeartClick(prompt)"
+                                  class="w-5 hover:fill-red-200 hover:stroke-red-200"
+                                />
+                                <HeartOutlineIcon
+                                  v-else
+                                  @click="onHeartClick(prompt)"
+                                  class="w-5 fill-red-400 stroke-red-400"
+                                />
+                                55.4k
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex text-center text-md">
+                      <div class="inline-flex gap-x-1.5 cursor-pointer">
+                        <ChevronLeftIcon
+                          class="-mr-1 h-4 w-4 text-gray-400 self-center"
+                          aria-hidden="true"
+                        />
+                        Previous
+                      </div>
+                      <div class="flex-grow">2/10000 prompts</div>
+                      <div class="inline-flex gap-x-1.5 cursor-pointer">
+                        Next
+                        <ChevronRightIcon
+                          class="-mr-1 h-4 w-4 text-gray-400 self-center"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </TabPanel>
+                <TabPanel :key="2">
+                  <div>
+                    <div class="flex-grow overflow-y-auto">hi</div>
+                    <div
+                      class="flex relative w-full bg-white-100 border-t-1 border-slate-400 flex-shrink-0 mt-auto"
+                      style="
+                        border-top: solid;
+                        border-width: 1px;
+                        border-color: #cfd8dc;
+                      "
+                    >
+                      <textarea
+                        v-model="questionInput"
+                        :disabled="isLoading"
+                        ref="messageInput"
+                        type="search"
+                        id="message-input"
+                        :class="isLoading ? 'cursor-wait' : ''"
+                        class="block w-full m-2 z-20 text-md text-slate-900 font-sans overflow-y-auto"
+                        rows="1"
+                        style="
+                          background: transparent;
+                          border: none;
+                          outline: none;
+                          resize: none;
+                        "
+                        :placeholder="
+                          !isLoading ? 'Ask a question...' : 'Loading...'
+                        "
+                        required
+                        @input="adjustHeight"
+                      />
+                      <button
+                        v-if="!isLoading"
+                        class="flex bg-white cursor-pointer border-none items-center justify-center mx-2 active:scale-95 focus:outline-none"
+                        @click="onSendClick"
+                      >
+                        <!-- Replace this with your send icon -->
+                        <img
+                          src="/assets/tabler-send.svg"
+                          class="text-slate-700 text-lg w-5 h-5 focus:text-blue-500 hover:text-blue-300"
+                        />
+                      </button>
+                      <button
+                        v-else
+                        type="button"
+                        class="bg-white border-none"
+                        disabled
+                      >
+                        <svg
+                          aria-hidden="true"
+                          class="inline w-5 h-5 mr-2 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
+                          viewBox="0 0 100 101"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+                            fill="currentColor"
+                          />
+                          <path
+                            d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                            fill="currentFill"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </TabPanel>
+              </TabPanels>
+              <TabList
+                class="absolute bottom-0 right-0 w-full mx-auto flex space-x-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 p-[10px] px-2"
+              >
+                <Tab
+                  v-for="(tab, index) in sidebarTabHeaders"
+                  as="template"
+                  :key="index"
+                  v-slot="{ selected }"
+                >
+                  <button
+                    :class="[
+                      'flex-1 rounded-lg py-1 text-[14px] font-medium leading-5 !text-white',
+                      'ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400  ',
+                      selected
+                        ? 'bg-cyan-600 shadow'
+                        : 'text-gray-700 hover:bg-white/[0.12] hover:text-gray-300',
+                    ]"
+                  >
+                    {{ tab.name }}
+                  </button>
+                </Tab>
+              </TabList>
+            </TabGroup>
+          </div>
+          <div
+            v-if="messageData.length > 0"
+            ref="chatContainer"
+            class="flex-grow overflow-y-auto rounded-lg"
           >
             <div
-              v-for="(msgData, msgIndex) in msgGrp.messages"
-              :key="msgIndex"
-              class="chat-font ml-3"
-              :class="[
-                msgGrp?.messages.length - 1 !== msgIndex ? 'mb-3' : 'mb-1',
-              ]"
-              :style="`font-size: ${settings.fontSize}px`"
+              v-for="(msgGrp, index) in messageData"
+              :key="index"
+              style="border-bottom: 1px solid rgb(235, 234, 226); padding: 10px"
+              class="chat-group d-flex align-start"
+              :class="
+                msgGrp.senderId ? 'sender-msg-container' : 'bot-msg-container'
+              "
             >
-              <pre
-                class="formatted-text my-0"
-                :style="`font-size: ${settings.fontSize}px; `"
-                v-html="formattedText(msgData?.message)"
-              ></pre>
-              <p
-                v-if="isCopiedTriggered === -1 || isCopiedTriggered !== index"
-                class="text-blue-600 hover:text-blue-800 underline text-xs my-0 cursor-pointer"
-                style="font-size: 8px"
-                @click="copyMessage(msgData?.message, index)"
-              >
-                Copy
-              </p>
-              <p
-                v-else-if="isCopiedTriggered === index"
-                class="italic my-0"
+              <div
+                v-for="(msgData, msgIndex) in msgGrp.messages"
+                :key="msgIndex"
+                class="chat-font ml-3"
+                :class="[
+                  msgGrp?.messages.length - 1 !== msgIndex ? 'mb-3' : 'mb-1',
+                ]"
                 :style="`font-size: ${settings.fontSize}px`"
               >
-                Copied
-              </p>
-            </div>
-          </div>
-        </div>
-        <div v-else class="flex-grow overflow-y-auto rounded-lg p-6 space-y-2">
-          <div class="bold" :style="`font-size: ${settings.fontSize + 1}px;`">
-            Welcome to Respond Buddy! 👋
-          </div>
-          <div :style="`font-size: ${settings.fontSize}px; line-height: 24px`">
-            Ready to try it? 🤔 Highlight on any text in your browser 🖱️, choose
-            from options like 'Summarize,' 'Simplify,' or 'Expand.'
-            <br />
-            <br />
-            Or start by asking a question at the bottom in the chat box. 📝
-            <br />
-            <br />
-          </div>
-          <div
-            v-if="!token"
-            class="flex flex-col gap-2 mt-2"
-            :style="`font-size: ${settings.fontSize + 1}px;`"
-          >
-            <div>If you love it, signup or login 😍</div>
-            <div class="flex">
-              <button
-                @click="onClickLoginRegister('login')"
-                type="button"
-                class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
-                style="color: white"
-              >
-                Login
-              </button>
-              <button
-                @click="onClickLoginRegister('register')"
-                type="button"
-                class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
-                style="color: white"
-              >
-                Register
-              </button>
-            </div>
-          </div>
-          <div
-            v-else
-            class="flex flex-col gap-2 mt-2"
-            :style="`font-size: ${settings.fontSize + 1}px;`"
-          >
-            <button
-              @click="onDashboardClick"
-              type="button"
-              class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
-              style="color: white"
-            >
-              Go to Dashboard
-            </button>
-          </div>
-          <div :style="`font-size: ${settings.fontSize}px`">
-            Please share it with your friends! 🙏
-          </div>
-          <div class="flex gap-1 border-none">
-            <button
-              v-for="social in socialMediaContents"
-              class="py-2 bg-transparent border-none hover:text-gray-300 cursor-pointer hover:shadow-lg rounded-full active:scale-95 focus:outline-none"
-              @click="shareToSocialMedia(social.type)"
-            >
-              <img class="w-7 h-7" :src="social.icon" />
-            </button>
-          </div>
-          <div class="bold" :style="`font-size: ${settings.fontSize + 1}px;`">
-            Start with these prompts 🚀
-          </div>
-          <div>
-            <div class="flex flex mt-2" style="flex-wrap: wrap">
-              <div v-for="prompt in prompts">
-                <button
-                  type="button"
-                  class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
-                  style="color: white"
-                  @click="prompt.action()"
+                <pre
+                  class="formatted-text my-0"
+                  :style="`font-size: ${settings.fontSize}px; `"
+                  v-html="formattedText(msgData?.message)"
+                ></pre>
+                <p
+                  v-if="isCopiedTriggered === -1 || isCopiedTriggered !== index"
+                  class="text-blue-600 hover:text-blue-800 underline text-xs my-0 cursor-pointer"
+                  style="font-size: 8px"
+                  @click="copyMessage(msgData?.message, index)"
                 >
-                  {{ prompt.name }}
-                </button>
+                  Copy
+                </p>
+                <p
+                  v-else-if="isCopiedTriggered === index"
+                  class="italic my-0"
+                  :style="`font-size: ${settings.fontSize}px`"
+                >
+                  Copied
+                </p>
               </div>
             </div>
           </div>
         </div>
-        <div
-          class="flex relative w-full bg-white-100 border-t-1 border-slate-400"
-          style="border-top: solid; border-width: 1px; border-color: #cfd8dc"
-        >
-          <textarea
-            v-model="questionInput"
-            :disabled="isLoading"
-            ref="messageInput"
-            type="search"
-            id="message-input"
-            :class="isLoading ? 'cursor-wait' : ''"
-            class="block w-full m-2 z-20 text-md text-slate-900 font-sans overflow-y-auto"
-            rows="1"
-            style="
-              background: transparent;
-              border: none;
-              outline: none;
-              resize: none;
-            "
-            :placeholder="!isLoading ? 'Ask a question...' : 'Loading...'"
-            required
-            @input="adjustHeight"
-          />
-          <button
-            v-if="!isLoading"
-            class="flex bg-white cursor-pointer border-none items-center justify-center mx-2 active:scale-95 focus:outline-none"
-            @click="onSendClick"
-          >
-            <!-- Replace this with your send icon -->
-            <img
-              src="/assets/tabler-send.svg"
-              class="text-slate-700 text-lg w-5 h-5 focus:text-blue-500 hover:text-blue-300"
-            />
-          </button>
-          <button v-else type="button" class="bg-white border-none" disabled>
-            <svg
-              aria-hidden="true"
-              class="inline w-5 h-5 mr-2 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
-              viewBox="0 0 100 101"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
-                fill="currentColor"
-              />
-              <path
-                d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
-                fill="currentFill"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
+      </TransitionChild>
+    </TransitionRoot>
     <div
       :style="{ right: `${right}px`, bottom: `${bottom}px` }"
       class="fixed flex right-0 bottom-0 m-5 z-100 flex items-end font-sans leading-1em"
@@ -1170,7 +1679,7 @@ onBeforeUnmount(() => {
 .sidebar {
   background-color: white;
   width: 100%;
-  height: 95%;
+  height: 99%;
   overflow-y: auto;
   border-radius: 12px;
   box-shadow: 0 5px 5px rgba(0, 0, 0, 0.5);
