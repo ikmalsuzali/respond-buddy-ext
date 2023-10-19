@@ -36,6 +36,8 @@ import { setupApp } from "~/logic/common-setup";
   shadowDOM.appendChild(root);
   document.body.appendChild(container);
   const app = createApp(App);
+  // Enable devtools
+  app.config.devtools = true;
   setupApp(app);
   app.mount(root);
 })();

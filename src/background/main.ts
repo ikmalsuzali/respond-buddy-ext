@@ -198,6 +198,127 @@ onMessage("get-access-token", async (data) => {
 //   }
 // });
 
+const createPromptTemplate = async (promptData: any) => {
+  try {
+    const baseURL = `${webUrl}/api/v1/tag`;
+    const url = new URL(baseURL);
+
+    const response = await fetch(`${url}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+      body: JSON.stringify(promptData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Failed to create prompt:", error);
+    return null;
+  }
+};
+
+const fetchTagCategories = async (name: string = "") => {
+  try {
+    const baseURL = `${webUrl}/api/v1/tag/categories`;
+    const url = new URL(baseURL);
+
+    if (name) {
+      url.searchParams.append("name", name);
+    }
+
+    // Add the query parameters to the URL
+    const data = await fetch(`${url}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    let response = await data.json();
+    console.log(
+      "🚀 ~ file: main.ts:216 ~ fetchTagCategories ~ response:",
+      response
+    );
+
+    return response?.data || [];
+  } catch (error) {
+    console.log("🚀 ~ file: main.ts:223 ~ fetchTagCategories ~ error:", error);
+
+    return [];
+  }
+};
+
+const fetchTags = async ({
+  page = 1,
+  limit = 50,
+  search = "",
+  sortBy = "relevance",
+  category,
+  filterType = "all",
+  userId,
+  workspaceId,
+  token, // assuming an authentication token is needed
+}: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sortBy?: string;
+  category?: string;
+  filterType?: string;
+  userId?: string;
+  workspaceId?: string;
+  token?: string;
+}) => {
+  // Construct the URL with query parameters
+  const baseURL = `${webUrl}/api/v1/tags`;
+  const url = new URL(baseURL);
+
+  url.searchParams.append("page", page.toString());
+  url.searchParams.append("limit", limit.toString());
+  url.searchParams.append("search", search);
+  url.searchParams.append("sort_by", sortBy);
+  url.searchParams.append("filter_type", filterType);
+
+  if (category) {
+    url.searchParams.append("category", category);
+  }
+  if (userId) {
+    url.searchParams.append("user_id", userId);
+  }
+
+  try {
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Failed to fetch tags:", error);
+    return null;
+  }
+};
+
 const processMessage = async (message: string, tabId: number, metadata: {}) => {
   const senderMessage = {
     senderId: userId.value,
@@ -259,7 +380,6 @@ const templatesInit = async () => {
     let response = await data.json();
 
     if (!response.data || response?.data.length === 0) return;
-    console.log(response?.data);
     templates.value = response?.data || [];
   } catch (error) {}
 };
@@ -599,4 +719,22 @@ onMessage("get-templates", () => {
 
 onMessage("set-templates", (templates) => {
   templatesInit();
+});
+
+onMessage("get-templates-api", async (message: any) => {
+  const data = await fetchTags(message?.data || {});
+  return data;
+});
+
+onMessage("get-template-categories-api", async (message: any) => {
+  const data = await fetchTagCategories(message?.data || "");
+  console.log("🚀 ~ file: main.ts:697 ~ onMessage ~ data:", data);
+  return data;
+});
+
+onMessage("create-prompt", async (message: any) => {
+  console.log("🚀 ~ file: main.ts:697 ~ onMessage ~ message", message);
+  const data = await createPromptTemplate(message?.data || {});
+  console.log("🚀 ~ file: main.ts:736 ~ onMessage ~ data:", data);
+  return data;
 });

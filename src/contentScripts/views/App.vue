@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import "../../styles/main.css";
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, unref } from "vue";
 import { useToggle } from "@vueuse/core";
 import { onMessage, sendMessage } from "webext-bridge/content-script";
 // import "uno.css";
-import facebookSvg from "../../assets/facebook-svgrepo.svg";
-import twitterSvg from "../../assets/twitter-svgrepo.svg";
-import linkedinSvg from "../../assets/linkedin-svgrepo.svg";
-import whatsappSvg from "../../assets/whatsapp-svgrepo.svg";
+
 import clipboardTextSvg from "../../assets/clipboard-text.svg";
 import analyzeSvg from "../../assets/analyze.svg";
 import fileInfoSvg from "../../assets/file-info.svg";
@@ -21,8 +18,11 @@ import {
   PaperAirplaneIcon,
   PlusIcon,
   XMarkIcon,
+  PaperClipIcon,
 } from "@heroicons/vue/24/solid";
 import {
+  TrashIcon,
+  PlusCircleIcon,
   HeartIcon as HeartOutlineIcon,
   ChartBarIcon,
 } from "@heroicons/vue/24/outline";
@@ -37,7 +37,30 @@ import {
   MenuItem,
   MenuItems,
 } from "@headlessui/vue";
-import { CheckIcon, ChevronDownIcon } from "@heroicons/vue/20/solid";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  PhotoIcon,
+  UserCircleIcon,
+} from "@heroicons/vue/20/solid";
+import { useDebounce } from "@vueuse/core";
+import {
+  TabGroup,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel,
+  TransitionChild,
+  TransitionRoot,
+} from "@headlessui/vue";
+import HomeTabPanel from "./HomeTabPanel.vue";
+
+const promptRoute = ref("listing");
+
+const selectedPrompt = ref({
+  key: "summarize",
+  name: "Summarize",
+});
 
 const publishingOptions = [
   {
@@ -64,30 +87,22 @@ const sortByMenuItems = ref([
     key: "top_trending",
   },
   {
-    name: "Private",
-    current: false,
-    key: "private",
-  },
-  {
     name: "Relevance",
     current: false,
     key: "relevance",
   },
   {
-    name: "Latest update",
+    name: "Newest",
     current: false,
-    key: "latest_update",
+    key: "created_at",
   },
 ]);
 
-const currentSortByItem = ref(sortByMenuItems.value[0]);
-const onSortByMenuItemClick = (item: any) => {
-  currentSortByItem.value = item;
-};
+const isPromptsLoading = ref(true);
 
 const categoryItems = [
   {
-    name: "Use Cases",
+    name: "All",
     current: false,
     key: "",
   },
@@ -113,22 +128,120 @@ const categoryItems = [
   },
 ];
 
+const assignees = [
+  { name: "Unassigned", value: null },
+  {
+    name: "Wade Cooper",
+    value: "wade-cooper",
+    avatar:
+      "https://images.unsplash.com/photo-1491528323818-fdd1faba62cc?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
+  },
+  // More items...
+];
+const labels = [
+  { name: "Unlabelled", value: null },
+  { name: "Engineering", value: "engineering" },
+  // More items...
+];
+const dueDates = [
+  { name: "No due date", value: null },
+  { name: "Today", value: "today" },
+  // More items...
+];
+
+const assigned = ref(assignees[0]);
+const labelled = ref(labels[0]);
+const dated = ref(dueDates[0]);
+
 const currentCategoryItem = ref(categoryItems[0]);
 const onFilterCategoryItem = (item: any) => {
   currentCategoryItem.value = item;
 };
 
-const selected = ref(publishingOptions[0]);
+const promptHints = ref([
+  {
+    name: "input",
+    value: "Give a template name",
+    disabled: true,
+  },
+]);
 
-import {
-  TabGroup,
-  TabList,
-  Tab,
-  TabPanels,
-  TabPanel,
-  TransitionChild,
-  TransitionRoot,
-} from "@headlessui/vue";
+const onAddPromptClick = () => {
+  promptHints.value.push({
+    name: "",
+    value: "",
+    disabled: false,
+  });
+};
+
+const onDeletePromptClick = (index: number) => {
+  if (promptHints.value.length <= 1) return;
+  removeDescriptionsBasedOnArray(
+    createPromptRequestData.value.description,
+    promptHints.value[index].value
+  );
+  promptHints.value.splice(index, 1);
+};
+
+const removeDescriptionsBasedOnArray = (
+  description: string,
+  matchStrings: any
+) => {
+  if (!description) return "";
+
+  matchStrings.forEach((matchString: string) => {
+    const regex = new RegExp(matchString, "g");
+    description = description.replace(regex, "");
+  });
+  return description;
+};
+
+const getCurrentAmount = (page: number, limit: number) => {
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const currentPrompts = promptsData.value.prompts.slice(startIndex, endIndex);
+  return currentPrompts.length;
+};
+
+const selected = ref(publishingOptions[0]);
+const promptsRequestData = ref({
+  search: "",
+  category: "",
+  sort_by: "top_usage",
+  page: 1,
+  limit: 50,
+});
+
+const createPromptRequestData = ref({
+  name: "",
+  description: "",
+  category: "",
+  privacy_type: "public",
+  ai_template: "",
+  is_liked: false,
+});
+
+const promptSearch = ref("");
+const debouncedPromptQuery = useDebounce(promptSearch, 300);
+
+const promptsData = ref({
+  prompts: [],
+  limit: 50,
+  page: 1,
+  total: 0,
+  totalPages: 2,
+});
+
+const privacyFilterItems = ref([
+  {
+    name: "Public",
+    key: "public",
+  },
+  {
+    name: "Private",
+    key: "private",
+  },
+]);
 
 const webConfig = ref([
   {
@@ -178,6 +291,31 @@ const sidebarTabHeaders = ref([
     key: "chat",
   },
 ]);
+
+const currentSortByItem = ref(sortByMenuItems.value[0]);
+const onSortByMenuItemClick = (item: any) => {
+  promptsRequestData.value = {
+    ...promptsRequestData.value,
+    sort_by: item.key,
+  };
+};
+
+const onUsedByWhoClick = (categoryId: string) => {
+  if (isCreatePromptLoading.value) return;
+
+  createPromptRequestData.value = {
+    ...createPromptRequestData.value,
+    category: categoryId,
+  };
+};
+
+const onPrivacyFilterItemClick = (key: string) => {
+  if (isCreatePromptLoading.value) return;
+  createPromptRequestData.value = {
+    ...createPromptRequestData.value,
+    privacy_type: key || "Public",
+  };
+};
 
 const right = ref(0);
 const bottom = ref(45);
@@ -278,7 +416,11 @@ let toolbarItems = ref([
 ]);
 let teleportTarget = ref("body");
 
-console.log("hello");
+const onPromptHintClick = (prompt: any) => {
+  if (isCreatePromptLoading.value) return;
+  createPromptRequestData.value.ai_template += ` [${prompt.name}]`;
+};
+
 let prompts = ref([
   {
     name: "Summarize this page",
@@ -351,18 +493,9 @@ const onClickToolbarItem = async (index: any) => {
 
 const startSidebarDrag = (event: any) => {
   sidebarKey.value += 1;
-  console.log("sidebar", sidebar.value);
   isSidebarDragging.value = true;
   sidebarStartX.value = event.clientX;
-  console.log(
-    "🚀 ~ file: App.vue:248 ~ startSidebarDrag ~ event.clientX:",
-    event
-  );
   sidebarWidth.value = sidebar.value?.offsetWidth;
-  console.log(
-    "🚀 ~ file: App.vue:250 ~ startSidebarDrag ~ sidebar.value?.offsetWidth:",
-    sidebar.value?.offsetWidth
-  );
 };
 
 const stopSidebarDrag = () => {
@@ -382,8 +515,9 @@ const handleMouseMove = (event) => {
     const diffX = event.clientX - sidebarStartX.value;
     const newWidth = sidebarWidth.value - diffX;
 
-    if (newWidth >= 300 && newWidth <= 1000) {
+    if (newWidth >= 450) {
       sidebar.value.style.width = `${newWidth}px`;
+      const disp = sidebar.value.style.display;
     }
   }
 };
@@ -399,54 +533,39 @@ let socialMediaShareMessage = ref([
   "Imagine having a tool that can summarize or expand any text online. Well, I found it! I think you'll love it as much as I do. 😍",
 ]);
 
-const getRandomItem = (arr: []) => {
-  if (!arr.length) {
-    return null; // Return null if the array is empty
-  }
-
-  const randomIndex = Math.floor(Math.random() * arr.length);
-  return arr[randomIndex];
-};
-
 watch(questionInput, () => {
   adjustHeight();
 });
 
-const socialMediaContents = ref([
-  {
-    type: "facebook",
-    icon: facebookSvg,
-  },
-  {
-    type: "twitter",
-    icon: twitterSvg,
-  },
-  {
-    type: "linkedin",
-    icon: linkedinSvg,
-  },
-  {
-    type: "whatsapp",
-    icon: whatsappSvg,
-  },
-]);
-
-const adjustHeight = () => {
-  nextTick(() => {
-    const textarea = messageInput.value;
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 100)}px`; // Limit to 100px or five lines
-  });
+const onNextPageClick = () => {
+  if (promptsData.value.page < promptsData.value.totalPages) {
+    promptsRequestData.value = {
+      ...promptsRequestData.value,
+      page: promptsData.value.page + 1,
+    };
+  }
 };
 
-const onClickLoginRegister = (type: string) => {
-  const loginWebUrl = "https://app.respondbuddy.com/";
-  const registerWebUrl = "https://app.respondbuddy.com/register";
-  if (type === "register") {
-    window.open(registerWebUrl, "_blank");
-    return;
+const onPreviousPageClick = () => {
+  if (promptsData.value.page > 1) {
+    promptsRequestData.value = {
+      ...promptsRequestData.value,
+      page: promptsData.value.page - 1,
+    };
   }
-  window.open(loginWebUrl, "_blank");
+};
+
+const adjustHeight = () => {
+  console.log("adjustHeight");
+  nextTick(() => {
+    const textarea = messageInput.value;
+    console.log(
+      "🚀 ~ file: App.vue:562 ~ nextTick ~ messageInput:",
+      messageInput
+    );
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`; // Limit to 100px or five lines
+  });
 };
 
 const shareToSocialMedia = (platform: string, content?: any = {}) => {
@@ -486,10 +605,12 @@ const onHeartClick = (prompt) => {
   prompt.isLiked = !prompt.isLiked;
 };
 
-const onDashboardClick = () => {
-  const webUrl = "https://app.respondbuddy.com";
-  window.open(webUrl, "_blank");
-};
+const createPromptError = ref({
+  name: "",
+  description: "",
+  category: "",
+  ai_template: "",
+});
 
 onMessage("toggle-chat", (_) => {
   toggle(true);
@@ -589,6 +710,40 @@ watchEffect(() => {
   }
 });
 
+watch(debouncedPromptQuery, async () => {
+  promptsRequestData.value = {
+    ...promptsRequestData.value,
+    search: debouncedPromptQuery.value,
+  };
+});
+
+watch(promptsRequestData, async () => {
+  await fetchTemplates(promptsRequestData.value);
+});
+
+const fetchTemplates = async (templateData = {}) => {
+  isPromptsLoading.value = true;
+  const data = await sendMessage("get-templates-api", templateData);
+
+  promptsData.value = {
+    prompts: data?.data || [],
+    limit: data?.limit || 50,
+    page: data?.page || 1,
+    total: data?.total || 0,
+    totalPages: data?.total_pages || 2,
+  };
+
+  isPromptsLoading.value = false;
+};
+
+const promptCategoriesData = ref([]);
+
+const fetchTemplateCategories = async (name: string = "") => {
+  const data = await sendMessage("get-template-categories-api", name);
+  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
+  promptCategoriesData.value = data || [];
+};
+
 const scrollToBottomInChatLog = () => {};
 
 const dragStart = (e) => {
@@ -606,12 +761,139 @@ const dragMove = (e) => {
   startY = e.clientY;
 };
 
+const onCancelCreatePromptClick = () => {
+  console.log("onCancelCreatePromptClick");
+  promptRoute.value = "listing";
+  createPromptRequestData.value = {
+    name: "",
+    description: "",
+    category: "",
+    ai_template: "",
+    is_liked: false,
+  };
+};
+
 const showIconOnSelection = () => {
   const selectedText = window.getSelection().toString().trim();
 
   if (selectedText.length > 0) {
     browser.runtime.sendMessage({ type: "highlight", text: selectedText });
   }
+};
+
+const onNewPrompt = () => {
+  promptRoute.value = "create";
+};
+
+const onCreatePromptClick = async () => {
+  isCreatePromptLoading.value = true;
+
+  let output = {};
+  promptHints.value.forEach((hint: any) => {
+    if (!hint?.name) return;
+    output[hint?.name] = {
+      description: hint.value,
+    };
+  });
+
+  createPromptRequestData.value.structured_output = output;
+
+  createPromptError.value = {
+    name: "",
+    description: "",
+    category: "",
+    ai_template: "",
+  };
+
+  console.log(
+    "🚀 ~ file: App.vue:826 ~ onCreatePromptClick ~ createPromptRequestData:",
+    createPromptRequestData.value
+  );
+
+  let hasError = ref(false);
+
+  // Handle errors
+  if (!createPromptRequestData.value.name) {
+    createPromptError.value.name = "Please enter a name";
+    hasError.value = true;
+  }
+  if (!createPromptRequestData.value.description) {
+    createPromptError.value.description = "Please enter a description";
+    hasError.value = true;
+  }
+  if (!createPromptRequestData.value.category) {
+    createPromptError.value.category = "Please select a category";
+    hasError.value = true;
+  }
+  if (!createPromptRequestData.value.ai_template) {
+    createPromptError.value.ai_template = "Please enter a template";
+    hasError.value = true;
+  }
+
+  createPromptError.value = {
+    ...createPromptError.value,
+    hint_description: {},
+    hint_name: {},
+  };
+  // Loop through output and check if there are any empty descriptions and name
+  let i = 0;
+  for (const [key, value] of Object.entries(output)) {
+    if (!key) {
+      createPromptError.value = {
+        ...createPromptError.value,
+        hint_name: {
+          ...createPromptError.value.hint_name,
+          [`${i}`]: "Please enter a prompt hint",
+        },
+      };
+      hasError.value = true;
+    }
+    if (!value?.description) {
+      createPromptError.value = {
+        ...createPromptError.value,
+        hint_description: {
+          ...createPromptError.value.hint_description,
+          [`${i}`]: "Please enter a hint description",
+        },
+      };
+      hasError.value = true;
+    }
+    i++;
+  }
+
+  console.log(createPromptError.value);
+
+  isCreatePromptLoading.value = false;
+
+  if (hasError.value === true) {
+    console.log(
+      "🚀 ~ file: App.vue:859 ~ onCreatePromptClick ~ hasError:",
+      hasError.value
+    );
+    hasError.value = false;
+    return;
+  }
+
+  const data = await sendMessage(
+    "create-prompt",
+    createPromptRequestData.value
+  );
+
+  console.log(data);
+
+  if (!data) return;
+
+  createPromptRequestData.value = {
+    name: "",
+    description: "",
+    category: "",
+    ai_template: "",
+    is_liked: false,
+    privacy_type: "private",
+  };
+
+  promptRoute.value = "listing";
+  fetchTemplates(promptsRequestData.value);
 };
 
 const dragEnd = () => {
@@ -773,6 +1055,18 @@ const setChatButtonPosition = ({ right, bottom }) => {
   );
 };
 
+const isCreatePromptLoading = ref(false);
+
+const onClickLoginRegister = (type: string) => {
+  const loginWebUrl = "https://app.respondbuddy.com/";
+  const registerWebUrl = "https://app.respondbuddy.com/register";
+  if (type === "register") {
+    window.open(registerWebUrl, "_blank");
+    return;
+  }
+  window.open(loginWebUrl, "_blank");
+};
+
 const getMessages = () => {
   sendMessage("get-messages", {}, "background").then((response) => {
     messageData.value = response?.messages || [];
@@ -855,6 +1149,8 @@ onMounted(() => {
   getFontSize();
   getChatButtonPosition();
   getTemplates();
+  fetchTemplates();
+  fetchTemplateCategories();
   // addHoverStyles();
   // renderImageIconButton();
   // onSettingsInit();
@@ -997,11 +1293,9 @@ onBeforeUnmount(() => {
         </div>
       </button>
     </div>
-    <TransitionRoot as="template" :show="show && isSidebar">
+    <TransitionRoot as="template" :show="show">
       <TransitionChild
         class="overlay"
-        ref="sidebar"
-        :key="sidebarKey"
         as="div"
         enter="transform transition ease-in-out duration-500 sm:duration-700"
         enter-from="translate-x-full"
@@ -1010,12 +1304,7 @@ onBeforeUnmount(() => {
         leave-from="translate-x-0"
         leave-to="translate-x-full"
       >
-        <div
-          class="sidebar flex flex-col"
-          @click.stop
-          @keydown.stop
-          @keypress.stop
-        >
+        <div ref="sidebar" class="sidebar flex flex-col">
           <div
             class="drag-icon"
             @mousedown.prevent="startSidebarDrag"
@@ -1026,397 +1315,1097 @@ onBeforeUnmount(() => {
             <TabGroup>
               <TabPanels class="">
                 <TabPanel :key="0">
-                  <div
-                    class="realtive sticky top-0 w-full rounded-b-3xl bg-center cursor-pointer object-cover z-10 shadow-lg gradient"
-                    :style="`background-image: linear-gradient(to bottom, rgba(245, 246, 252, 0.82), rgba(59,130,246, 0.89)), url(${homeBackgroundUrl})`"
-                  >
+                  <HomeTabPanel
+                    :token="token"
+                    :settings="settings"
+                    :prompts="promptsData.prompts"
+                  />
+                </TabPanel>
+                <TabPanel :key="1" class="flex flex-col">
+                  <div>
                     <div
-                      class="pt-5 px-3 rounded-lg flex flex-col w-full text-white"
+                      v-if="promptRoute == 'listing'"
+                      class="px-6 space-y-3 overflow-y-auto mb-14"
                     >
-                      <div class="font-bold text-xl my-10">
-                        Welcome to Respond Buddy! 👋
+                      <div class="flex my-4">
+                        <div class="font-bold text-xl w-full">Prompts</div>
+                        <Listbox as="div" v-model="selected">
+                          <ListboxLabel class="sr-only"
+                            >Create new prompt</ListboxLabel
+                          >
+                          <div class="relative">
+                            <div
+                              class="inline-flex divide-x divide-blue-500 rounded-md shadow-sm"
+                            >
+                              <div
+                                class="w-[140px] inline-flex items-center gap-x-1.5 rounded-md bg-blue-500 px-3 py-2 text-white shadow-sm cursor-pointer"
+                                @click.stop="onNewPrompt"
+                              >
+                                <PlusIcon
+                                  class="-ml-0.5 h-5 w-5 fill-white"
+                                  aria-hidden="true"
+                                />
+                                <p class="text-sm font-semibold !text-white">
+                                  {{ "New Prompt" }}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </Listbox>
                       </div>
-                      <div class="text-md">
-                        Ready to try it? 🤔 Highlight on any text in your
-                        browser 🖱️, choose from options like 'Summarize,'
-                        'Simplify,' or 'Expand.'
-                        <br />
-                        Or start by asking a question at the bottom in the chat
-                        box. 📝
-                        <br />
-                      </div>
-                    </div>
-
-                    <div class="flex items-center justify-between px-3 z-10">
-                      <div class="relative w-full my-4">
+                      <div>
                         <input
+                          v-model="promptSearch"
                           type="text"
-                          class="bg-purple-white shadow rounded-xl border-0 p-3 w-full bg-white"
-                          placeholder="Ask me anything"
+                          name="name"
+                          id="name"
+                          class="bg-white block w-full rounded-full border-0 px-4 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-blue-100 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                          placeholder="Search for prompt"
                         />
+                      </div>
+                      <div class="flex gap-2">
+                        <Menu as="div" class="relative inline-block text-left">
+                          <div>
+                            <MenuButton
+                              class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-white px-2 py-1 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                            >
+                              {{
+                                sortByMenuItems.find(
+                                  (item) =>
+                                    item.key === promptsRequestData.sort_by
+                                ).name || "Sort By"
+                              }}
+                              <ChevronDownIcon
+                                class="-mr-1 h-5 w-5 text-gray-400"
+                                aria-hidden="true"
+                              />
+                            </MenuButton>
+                          </div>
+
+                          <transition
+                            enter-active-class="transition ease-out duration-100"
+                            enter-from-class="transform opacity-0 scale-95"
+                            enter-to-class="transform opacity-100 scale-100"
+                            leave-active-class="transition ease-in duration-75"
+                            leave-from-class="transform opacity-100 scale-100"
+                            leave-to-class="transform opacity-0 scale-95"
+                          >
+                            <MenuItems
+                              class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                            >
+                              <div class="py-1">
+                                <MenuItem
+                                  v-for="item in sortByMenuItems"
+                                  v-slot="{ active }"
+                                >
+                                  <a
+                                    href="#"
+                                    :class="[
+                                      active
+                                        ? 'bg-gray-100 text-gray-900'
+                                        : 'text-gray-700',
+                                      'block px-4 py-2 text-sm',
+                                    ]"
+                                    @click="onSortByMenuItemClick(item)"
+                                    >{{ item.name }}</a
+                                  >
+                                </MenuItem>
+                              </div>
+                            </MenuItems>
+                          </transition>
+                        </Menu>
+                        <Menu as="div" class="relative inline-block text-left">
+                          <div>
+                            <MenuButton
+                              class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-white px-2 py-1 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                            >
+                              {{ currentCategoryItem.name }}
+                              <ChevronDownIcon
+                                v-if="currentCategoryItem.key === ''"
+                                class="-mr-1 h-5 w-5 text-gray-400"
+                                aria-hidden="true"
+                              />
+                              <XMarkIcon
+                                v-else
+                                class="-mr-1 h-5 w-5 text-gray-400"
+                                aria-hidden="true"
+                                @click.stop="
+                                  onFilterCategoryItem(categoryItems[0])
+                                "
+                              />
+                            </MenuButton>
+                          </div>
+
+                          <transition
+                            enter-active-class="transition ease-out duration-100"
+                            enter-from-class="transform opacity-0 scale-95"
+                            enter-to-class="transform opacity-100 scale-100"
+                            leave-active-class="transition ease-in duration-75"
+                            leave-from-class="transform opacity-100 scale-100"
+                            leave-to-class="transform opacity-0 scale-95"
+                          >
+                            <MenuItems
+                              class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                            >
+                              <div class="py-1">
+                                <MenuItem
+                                  v-for="item in categoryItems"
+                                  v-slot="{ active }"
+                                >
+                                  <a
+                                    href="#"
+                                    :class="[
+                                      active
+                                        ? 'bg-gray-100 text-gray-900'
+                                        : 'text-gray-700',
+                                      'block px-4 py-2 text-sm',
+                                    ]"
+                                    @click="onFilterCategoryItem(item)"
+                                    >{{ item.name }}</a
+                                  >
+                                </MenuItem>
+                              </div>
+                            </MenuItems>
+                          </transition>
+                        </Menu>
+                      </div>
+                      <div class="flex flex-wrap gap-4 place-content-center">
                         <div
-                          class="absolute top-0 right-0 p-4 pr-3 text-purple-lighter"
+                          v-if="isPromptsLoading"
+                          class="w-full flex flex-wrap gap-4"
                         >
-                          <PaperAirplaneIcon
-                            class="h-5 w-5 fill-gray-400"
+                          <div
+                            v-for="_ in 5"
+                            class="w-full max-w-md mx-auto overflow-hidden rounded-lg shadow-lg animate-pulse bg-slate-300"
+                          >
+                            <div class="w-full p-4 md:p-4">
+                              <h1 class="w-40 h-2 bg-gray-200 rounded-lg"></h1>
+
+                              <p
+                                class="w-48 h-2 mt-4 bg-gray-200 rounded-lg"
+                              ></p>
+
+                              <div class="flex mt-4 item-center gap-x-2">
+                                <p class="w-5 h-2 bg-gray-200 rounded-lg"></p>
+                                <p class="w-5 h-2 bg-gray-200 rounded-lg"></p>
+                                <p class="w-5 h-2 bg-gray-200 rounded-lg"></p>
+                                <p class="w-5 h-2 bg-gray-200 rounded-lg"></p>
+                                <p class="w-5 h-2 bg-gray-200 rounded-lg"></p>
+                              </div>
+
+                              <div
+                                class="flex justify-between mt-6 item-center"
+                              >
+                                <h1
+                                  class="w-10 h-2 bg-gray-200 rounded-lg"
+                                ></h1>
+
+                                <div
+                                  class="h-4 bg-gray-200 rounded-lg w-28"
+                                ></div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          v-else
+                          class="cursor-pointer min-w-[220px] max-w-[400px] sm:max-w-[400px] height-[312px] w-full"
+                          v-for="prompt in promptsData.prompts"
+                        >
+                          <!-- Prompt Card -->
+                          <div
+                            class="prompt-card shadow-md bg-gradient-to-r from-blue-400 to-blue-600 rounded-xl hover:shadow-xl h-full"
+                          >
+                            <div
+                              class="bg-white rounded-xl shadow-md hover:shadow-lg flex items-center justify-between px-4 py-2 h-full"
+                            >
+                              <div class="flex items-center space-x-2">
+                                <div class="space-y-1">
+                                  <h2 class="text-lg">{{ prompt?.name }}</h2>
+                                  <div
+                                    class="text-sm font-light text-gray-600 space-x-2 line-clamp-3 leading-5"
+                                  >
+                                    {{
+                                      prompt?.used_description ||
+                                      "The sun dipped below the horizon, casting a warm, golden glow across the tranquil lake. The gentle ripples on the water's surface mirrored the fading colors of the sky, creating a breathtaking panorama. As the stars began to emerge one by one, the world around me grew quiet, and I couldn't help but feel a sense of peace and wonder. Nature's beauty never ceased to amaze, reminding me of the simple joys that life has to offer"
+                                    }}
+                                  </div>
+                                  <div
+                                    class="flex text-sm font-light text-gray-600 space-x-2"
+                                  >
+                                    <p class="text-gray-600">Text Generation</p>
+
+                                    <div class="flex gap-1">
+                                      <ChartBarIcon
+                                        class="w-5 hover:fill-grey-500"
+                                      />
+                                      55.4k
+                                    </div>
+                                    <div class="flex gap-1">
+                                      <HeartOutlineIcon
+                                        v-if="!prompt?.isLiked"
+                                        @click="onHeartClick(prompt)"
+                                        class="w-5 hover:fill-red-200 hover:stroke-red-200"
+                                      />
+                                      <HeartOutlineIcon
+                                        v-else
+                                        @click="onHeartClick(prompt)"
+                                        class="w-5 fill-red-400 stroke-red-400"
+                                      />
+                                      55.4k
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="flex text-center text-md">
+                        <div
+                          class="inline-flex gap-x-1.5 cursor-pointer"
+                          :class="{
+                            'cursor-not-allowed text-gray-300':
+                              promptsData.page == 1,
+                          }"
+                        >
+                          <ChevronLeftIcon
+                            class="-mr-1 h-4 w-4 text-gray-800 self-center"
+                            aria-hidden="true"
+                            :class="{
+                              'cursor-not-allowed text-gray-300':
+                                promptsData.page == 1,
+                            }"
+                            @click="onPreviousPageClick"
+                          />
+                          Previous
+                        </div>
+                        <!-- Get current records -->
+
+                        <div class="flex-grow">
+                          {{
+                            `${getCurrentAmount(
+                              promptsData.page,
+                              promptsData.limit
+                            )} / ${promptsData.total} prompts`
+                          }}
+                        </div>
+                        <div
+                          class="inline-flex gap-x-1.5 cursor-pointer"
+                          @click="onNextPageClick"
+                        >
+                          Next
+                          <ChevronRightIcon
+                            class="-mr-1 h-4 w-4 text-gray-300 self-center"
                             aria-hidden="true"
                           />
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <div
-                    class="flex-grow overflow-y-auto rounded-lg px-5 space-y-2"
-                  >
-                    <div
-                      v-if="!token"
-                      class="flex flex-col gap-2 mt-2"
-                      :style="`font-size: ${settings.fontSize + 1}px;`"
+                    <TransitionRoot
+                      :show="promptRoute == 'create'"
+                      enter="transition-opacity duration-500"
+                      enter-from="opacity-0"
+                      enter-to="opacity-100"
+                      leave="transition-opacity duration-500"
+                      leave-from="opacity-100"
+                      leave-to="opacity-0"
                     >
-                      <div>If you love it, signup or login 😍</div>
-                      <div class="flex">
-                        <button
-                          @click="onClickLoginRegister('login')"
-                          type="button"
-                          class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
-                          style="color: white"
+                      <div class="space-y-12">
+                        <div
+                          class="flex flex-wrap gap-x-8 gap-y-10 border-b border-gray-900/10 pb-12"
                         >
-                          Login
-                        </button>
-                        <button
-                          @click="onClickLoginRegister('register')"
-                          type="button"
-                          class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
-                          style="color: white"
-                        >
-                          Register
-                        </button>
-                      </div>
-                    </div>
-                    <div
-                      v-else
-                      class="flex flex-col gap-2 mt-3"
-                      :style="`font-size: ${settings.fontSize + 1}px;`"
-                    >
-                      <button
-                        @click="onDashboardClick"
-                        type="button"
-                        class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
-                        style="color: white"
-                      >
-                        Go to Dashboard
-                      </button>
-                    </div>
-                    <div class="text-lg font-bold">
-                      Please share it with your friends! 🙏
-                    </div>
-                    <div class="flex gap-2 border-none">
-                      <button
-                        v-for="social in socialMediaContents"
-                        class="p-2 bg-transparent border-none hover:text-gray-300 cursor-pointer hover:shadow-lg hover:rounded active:scale-95 focus:outline-none"
-                        @click="shareToSocialMedia(social.type)"
-                      >
-                        <img class="w-10 h-10" :src="social.icon" />
-                      </button>
-                    </div>
-                    <div class="text-lg font-bold">
-                      Start with these prompts 🚀
-                    </div>
-                    <div>
-                      <div class="flex mt-2" style="flex-wrap: wrap">
-                        <div v-for="prompt in prompts">
-                          <button
-                            type="button"
-                            class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
-                            style="color: white"
-                            @click="prompt.action()"
-                          >
-                            {{ prompt.name }}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabPanel>
-                <TabPanel :key="1" class="flex flex-col">
-                  <div class="px-4 space-y-3 overflow-y-auto mb-14">
-                    <div class="flex my-4">
-                      <div class="font-bold text-xl w-full">Prompts</div>
-                      <Listbox as="div" v-model="selected">
-                        <ListboxLabel class="sr-only"
-                          >Create new prompt</ListboxLabel
-                        >
-                        <div class="relative">
-                          <div
-                            class="inline-flex divide-x divide-blue-500 rounded-md shadow-sm"
-                          >
-                            <div
-                              class="w-[140px] inline-flex items-center gap-x-1.5 rounded-md bg-blue-500 px-3 py-2 text-white shadow-sm cursor-pointer"
-                              @click.stop="onCreateNewPrompt"
-                            >
-                              <PlusIcon
-                                class="-ml-0.5 h-5 w-5 fill-white"
-                                aria-hidden="true"
-                              />
-                              <p class="text-sm font-semibold !text-white">
-                                {{ "New Prompt" }}
-                              </p>
-                            </div>
-                            <!-- <ListboxButton
-                              class="inline-flex items-center rounded-l-none rounded-r-md bg-blue-500 p-2 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-50"
-                            >
-                              <span class="sr-only">Button</span>
-                              <ChevronDownIcon
-                                class="h-5 w-5 !fill-white"
-                                aria-hidden="true"
-                              />
-                            </ListboxButton> -->
-                          </div>
-
-                          <!-- <transition
-                            leave-active-class="transition ease-in duration-100"
-                            leave-from-class="opacity-100"
-                            leave-to-class="opacity-0"
-                          >
-                            <ListboxOptions
-                              class="absolute right-0 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-200 overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
-                            >
-                              <ListboxOption
-                                as="template"
-                                v-for="option in publishingOptions"
-                                :key="option.title"
-                                :value="option"
-                                v-slot="{ active, selected }"
+                          <!-- <div class="flex-1 sm:hidden md:visible">
+                              <div
+                                class="bg-white p-6 rounded-lg max-w-lg mx-auto"
                               >
-                                <li
-                                  :class="[
-                                    active
-                                      ? 'bg-blue-500 text-white'
-                                      : 'text-white',
-                                    'cursor-default select-none p-4 text-sm',
-                                  ]"
+                                <h2 class="text-xl font-bold mb-4">
+                                  Creating a Custom Prompt - Simplified for
+                                  Clarity
+                                </h2>
+                                <p class="text-gray-700 mb-3">
+                                  Hey there! 🌟 Ready to craft a custom prompt?
+                                  Great! Here's how:
+                                </p>
+
+                                <ol class="list-decimal pl-5">
+                                  <li class="mb-2">
+                                    <span class="font-semibold"
+                                      >Define Your Goal:</span
+                                    >
+                                    Think about the response you're aiming for.
+                                    Whether it's feedback, an answer, or data,
+                                    keep that goal in mind.
+                                  </li>
+                                  <li class="mb-2">
+                                    <span class="font-semibold"
+                                      >Be Clear & Concise:</span
+                                    >
+                                    Avoid jargon or lengthy sentences. A simple
+                                    and straightforward question or statement
+                                    works best.
+                                  </li>
+                                  <li class="mb-2">
+                                    <span class="font-semibold"
+                                      >Use the 'Custom Prompt' Field:</span
+                                    >
+                                    Once you've crafted your prompt, type it
+                                    into the 'Custom Prompt' field.
+                                  </li>
+                                  <li class="mb-2">
+                                    <span class="font-semibold"
+                                      >Save & Go:</span
+                                    >
+                                    Once you're satisfied, hit "Save". Your
+                                    custom prompt is now active and ready for
+                                    responses!
+                                  </li>
+                                </ol>
+
+                                <p class="text-gray-600 mt-4 italic">
+                                  Remember, a clear prompt means clear
+                                  responses. Happy prompting!
+                                </p>
+                              </div>
+                            </div> -->
+                          <div class="flex-1 md:flex-2 px-12 py-8">
+                            <div>
+                              <h2 class="text-xl font-bold mb-4">
+                                Create a Custom Prompt
+                              </h2>
+                            </div>
+                            <div
+                              v-if="!token"
+                              class="bg-blue-100 border-t border-b border-blue-500 text-blue-700 px-4 py-4 mb-4 space-y-4"
+                              role="alert"
+                            >
+                              <p class="font-bold">
+                                Please register/login to create prompt
+                              </p>
+
+                              <div class="flex mt-3">
+                                <button
+                                  @click="onClickLoginRegister('login')"
+                                  type="button"
+                                  class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                                  style="color: white"
                                 >
-                                  <div class="flex flex-col">
-                                    <div class="flex justify-between">
-                                      <p
+                                  Login
+                                </button>
+                                <button
+                                  @click="onClickLoginRegister('register')"
+                                  type="button"
+                                  class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                                  style="color: white"
+                                >
+                                  Register
+                                </button>
+                              </div>
+                            </div>
+                            <div
+                              class="flex flex-wrap gap-x-4 gap-y-4 max-w-2xl"
+                            >
+                              <div class="w-full sm:hidden">
+                                <div
+                                  class="mt-6 flex items-center justify-end gap-x-6"
+                                >
+                                  <button
+                                    type="button"
+                                    class="text-sm font-semibold leading-6 text-gray-900"
+                                    @click="onCancelCreatePromptClick"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="submit"
+                                    class="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold !text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                                    @click="onCreatePromptClick"
+                                  >
+                                    Save
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div class="w-full flex gap-x-4">
+                                <div class="flex gap-x-4">
+                                  <div>
+                                    <label
+                                      for="about"
+                                      class="block text-sm font-medium leading-6 text-gray-900"
+                                      >Used By Who?</label
+                                    >
+
+                                    <Menu
+                                      as="div"
+                                      class="relative inline-block text-left mt-2"
+                                    >
+                                      <MenuButton
+                                        class="inline-flex w-32 justify-center gap-x-1.5 rounded-lg bg-gray-50 px-2 py-1 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                                         :class="
-                                          selected
-                                            ? 'font-semibold'
-                                            : 'font-normal'
+                                          isCreatePromptLoading
+                                            ? 'bg-gray-200'
+                                            : null
                                         "
                                       >
-                                        {{ option.title }}
-                                      </p>
-                                      <span
-                                        v-if="selected"
-                                        :class="
-                                          active
-                                            ? 'text-white'
-                                            : 'text-blue-500'
-                                        "
-                                      >
-                                        <CheckIcon
-                                          class="h-5 w-5"
+                                        <div class="w-full text-right">
+                                          {{
+                                            promptCategoriesData.find(
+                                              (item) =>
+                                                item.id ===
+                                                createPromptRequestData.category
+                                            )?.name || "All"
+                                          }}
+                                        </div>
+
+                                        <ChevronDownIcon
+                                          class="-mr-1 h-5 w-5 text-gray-400"
                                           aria-hidden="true"
                                         />
-                                      </span>
-                                    </div>
-                                    <p
-                                      :class="[
-                                        active
-                                          ? 'text-indigo-200'
-                                          : 'text-gray-500',
-                                        'mt-2',
-                                      ]"
-                                    >
-                                      {{ option.description }}
-                                    </p>
+                                      </MenuButton>
+
+                                      <transition
+                                        enter-active-class="transition ease-out duration-100"
+                                        enter-from-class="transform opacity-0 scale-95"
+                                        enter-to-class="transform opacity-100 scale-100"
+                                        leave-active-class="transition ease-in duration-75"
+                                        leave-from-class="transform opacity-100 scale-100"
+                                        leave-to-class="transform opacity-0 scale-95"
+                                      >
+                                        <MenuItems
+                                          class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none overflow-y-auto h-64"
+                                        >
+                                          <div class="py-1">
+                                            <MenuItem
+                                              v-for="item in promptCategoriesData"
+                                              v-slot="{ active }"
+                                            >
+                                              <a
+                                                href="#"
+                                                :class="[
+                                                  active
+                                                    ? 'bg-gray-100 text-gray-900'
+                                                    : 'text-gray-700',
+                                                  'block px-4 py-2 text-sm',
+                                                ]"
+                                                @click="
+                                                  onUsedByWhoClick(item.id)
+                                                "
+                                                >{{ item.name }}</a
+                                              >
+                                            </MenuItem>
+                                          </div>
+                                        </MenuItems>
+                                      </transition>
+                                    </Menu>
                                   </div>
-                                </li>
-                              </ListboxOption>
-                            </ListboxOptions>
-                          </transition> -->
-                        </div>
-                      </Listbox>
-                    </div>
-                    <div>
-                      <input
-                        type="text"
-                        name="name"
-                        id="name"
-                        class="bg-white block w-full rounded-full border-0 px-4 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-blue-100 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                        placeholder="Search for prompt"
-                      />
-                    </div>
-                    <div class="flex gap-2">
-                      <Menu as="div" class="relative inline-block text-left">
-                        <div>
-                          <MenuButton
-                            class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-white px-2 py-1 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                          >
-                            {{ currentSortByItem.name }}
-                            <ChevronDownIcon
-                              class="-mr-1 h-5 w-5 text-gray-400"
-                              aria-hidden="true"
-                            />
-                          </MenuButton>
-                        </div>
+                                  <div>
+                                    <label
+                                      for="about"
+                                      class="block text-sm font-medium leading-6 text-gray-900"
+                                      >Who can see?</label
+                                    >
+                                    <Menu
+                                      as="div"
+                                      class="relative inline-block text-left mt-2"
+                                    >
+                                      <MenuButton
+                                        class="bg-gray-50 inline-flex w-32 justify-center gap-x-1.5 rounded-lg px-2 py-1 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                                        :class="
+                                          isCreatePromptLoading
+                                            ? 'bg-gray-200'
+                                            : null
+                                        "
+                                      >
+                                        <div class="w-full text-right">
+                                          {{
+                                            privacyFilterItems.find(
+                                              (item) =>
+                                                item.key ===
+                                                createPromptRequestData.privacy_type
+                                            )?.name
+                                          }}
+                                        </div>
+                                        <ChevronDownIcon
+                                          class="-mr-1 h-5 w-5 text-gray-400"
+                                          aria-hidden="true"
+                                        />
+                                      </MenuButton>
 
-                        <transition
-                          enter-active-class="transition ease-out duration-100"
-                          enter-from-class="transform opacity-0 scale-95"
-                          enter-to-class="transform opacity-100 scale-100"
-                          leave-active-class="transition ease-in duration-75"
-                          leave-from-class="transform opacity-100 scale-100"
-                          leave-to-class="transform opacity-0 scale-95"
-                        >
-                          <MenuItems
-                            class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
-                          >
-                            <div class="py-1">
-                              <MenuItem
-                                v-for="item in sortByMenuItems"
-                                v-slot="{ active }"
-                              >
-                                <a
-                                  href="#"
-                                  :class="[
-                                    active
-                                      ? 'bg-gray-100 text-gray-900'
-                                      : 'text-gray-700',
-                                    'block px-4 py-2 text-sm',
-                                  ]"
-                                  @click="onSortByMenuItemClick(item)"
-                                  >{{ item.name }}</a
-                                >
-                              </MenuItem>
-                            </div>
-                          </MenuItems>
-                        </transition>
-                      </Menu>
-                      <Menu as="div" class="relative inline-block text-left">
-                        <div>
-                          <MenuButton
-                            class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-white px-2 py-1 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                          >
-                            {{ currentCategoryItem.name }}
-                            <ChevronDownIcon
-                              v-if="currentCategoryItem.key === ''"
-                              class="-mr-1 h-5 w-5 text-gray-400"
-                              aria-hidden="true"
-                            />
-                            <XMarkIcon
-                              v-else
-                              class="-mr-1 h-5 w-5 text-gray-400"
-                              aria-hidden="true"
-                              @click.stop="
-                                onFilterCategoryItem(categoryItems[0])
-                              "
-                            />
-                          </MenuButton>
-                        </div>
-
-                        <transition
-                          enter-active-class="transition ease-out duration-100"
-                          enter-from-class="transform opacity-0 scale-95"
-                          enter-to-class="transform opacity-100 scale-100"
-                          leave-active-class="transition ease-in duration-75"
-                          leave-from-class="transform opacity-100 scale-100"
-                          leave-to-class="transform opacity-0 scale-95"
-                        >
-                          <MenuItems
-                            class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
-                          >
-                            <div class="py-1">
-                              <MenuItem
-                                v-for="item in categoryItems"
-                                v-slot="{ active }"
-                              >
-                                <a
-                                  href="#"
-                                  :class="[
-                                    active
-                                      ? 'bg-gray-100 text-gray-900'
-                                      : 'text-gray-700',
-                                    'block px-4 py-2 text-sm',
-                                  ]"
-                                  @click="onFilterCategoryItem(item)"
-                                  >{{ item.name }}</a
-                                >
-                              </MenuItem>
-                            </div>
-                          </MenuItems>
-                        </transition>
-                      </Menu>
-                    </div>
-                    <div class="cursor-pointer" v-for="prompt in prompts">
-                      <div
-                        class="bg-slate-200 rounded-xl shadow-md max-w-lg flex items-center justify-between px-4 py-2"
-                      >
-                        <div class="flex items-center space-x-2">
-                          <!-- <div class="bg-orange-500 p-2 rounded-full">
-                        <img class="h-6 w-6" alt="Icon" />
-                      </div> -->
-                          <div class="space-y-1">
-                            <h2 class="text-lg">{{ prompt.name }}</h2>
-                            <div
-                              class="text-sm font-light text-gray-600 space-x-2 line-clamp-3 leading-5"
-                            >
-                              {{
-                                prompt?.used_description ||
-                                "The sun dipped below the horizon, casting a warm, golden glow across the tranquil lake. The gentle ripples on the water's surface mirrored the fading colors of the sky, creating a breathtaking panorama. As the stars began to emerge one by one, the world around me grew quiet, and I couldn't help but feel a sense of peace and wonder. Nature's beauty never ceased to amaze, reminding me of the simple joys that life has to offer"
-                              }}
-                            </div>
-                            <div
-                              class="flex text-sm font-light text-gray-600 space-x-2"
-                            >
-                              <p class="text-gray-600">Text Generation</p>
-
-                              <div class="flex gap-1">
-                                <ChartBarIcon class="w-5 hover:fill-grey-500" />
-                                55.4k
+                                      <transition
+                                        enter-active-class="transition ease-out duration-100"
+                                        enter-from-class="transform opacity-0 scale-95"
+                                        enter-to-class="transform opacity-100 scale-100"
+                                        leave-active-class="transition ease-in duration-75"
+                                        leave-from-class="transform opacity-100 scale-100"
+                                        leave-to-class="transform opacity-0 scale-95"
+                                      >
+                                        <MenuItems
+                                          class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                                        >
+                                          <div class="py-1">
+                                            <MenuItem
+                                              v-for="item in privacyFilterItems"
+                                              v-slot="{ active }"
+                                            >
+                                              <a
+                                                href="#"
+                                                :class="[
+                                                  active
+                                                    ? 'bg-gray-100 text-gray-900'
+                                                    : 'text-gray-700',
+                                                  'block px-4 py-2 text-sm',
+                                                ]"
+                                                @click="
+                                                  onPrivacyFilterItemClick(
+                                                    item.key
+                                                  )
+                                                "
+                                                >{{ item.name }}</a
+                                              >
+                                            </MenuItem>
+                                          </div>
+                                        </MenuItems>
+                                      </transition>
+                                    </Menu>
+                                  </div>
+                                </div>
                               </div>
-                              <div class="flex gap-1">
-                                <HeartOutlineIcon
-                                  v-if="!prompt?.isLiked"
-                                  @click="onHeartClick(prompt)"
-                                  class="w-5 hover:fill-red-200 hover:stroke-red-200"
-                                />
-                                <HeartOutlineIcon
-                                  v-else
-                                  @click="onHeartClick(prompt)"
-                                  class="w-5 fill-red-400 stroke-red-400"
-                                />
-                                55.4k
+
+                              <div class="w-full sm:w-2/3">
+                                <label
+                                  for="first-name"
+                                  class="block text-sm font-medium leading-6 text-gray-900"
+                                  >Prompt name</label
+                                >
+                                <div class="mt-2">
+                                  <input
+                                    v-model="createPromptRequestData.name"
+                                    :disabled="isCreatePromptLoading"
+                                    type="text"
+                                    name="first-name"
+                                    id="first-name"
+                                    autocomplete="given-name"
+                                    class="placeholder:px-5 px-4 block w-full bg-gray-50 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                                    :class="
+                                      isCreatePromptLoading
+                                        ? 'bg-gray-200'
+                                        : null
+                                    "
+                                  />
+                                  <p
+                                    v-if="createPromptError['name']"
+                                    class="!text-red-500 text-xs italic"
+                                  >
+                                    {{ createPromptError["name"] }}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div class="w-full">
+                                <label
+                                  for="about"
+                                  class="block text-sm font-medium leading-6 text-gray-900"
+                                  >Prompt Description</label
+                                >
+                                <div class="mt-2">
+                                  <textarea
+                                    v-model="
+                                      createPromptRequestData.description
+                                    "
+                                    :disabled="isCreatePromptLoading"
+                                    id="description"
+                                    name="about"
+                                    rows="5"
+                                    placeholder="Write up to three sentences about your prompt."
+                                    maxlength="160"
+                                    class="bg-gray-50 px-4 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                                    :class="
+                                      isCreatePromptLoading
+                                        ? 'bg-gray-200'
+                                        : null
+                                    "
+                                  />
+                                  <p
+                                    v-if="createPromptError['description']"
+                                    class="!text-red-500 text-xs italic"
+                                  >
+                                    {{ createPromptError["description"] }}
+                                  </p>
+                                </div>
+                                <p
+                                  class="mt-1 text-sm leading-6 text-gray-600 font-light text-right"
+                                >
+                                  {{
+                                    `${
+                                      createPromptRequestData?.description
+                                        .length || 0
+                                    }/160 characters`
+                                  }}
+                                </p>
+                              </div>
+
+                              <div class="w-full">
+                                <label
+                                  for="about"
+                                  class="block text-sm font-medium leading-6 text-gray-900"
+                                  >Prompt Template</label
+                                >
+                                <div class="mt-2">
+                                  <textarea
+                                    v-model="
+                                      createPromptRequestData.ai_template
+                                    "
+                                    :disabled="isCreatePromptLoading"
+                                    id="description"
+                                    name="about"
+                                    rows="10"
+                                    placeholder="Write a up to three sentences about your prompt."
+                                    class="bg-gray-50 resize-none px-4 block w-full rounded-t-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                                  />
+                                  <div
+                                    class="bg-gray-50 px-4 block w-full border-t-0 rounded-b-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                                  >
+                                    <div class="flex flex-wrap gap-2">
+                                      <button
+                                        v-for="hint in promptHints?.filter(
+                                          (hint) => hint.name !== ''
+                                        )"
+                                        type="button"
+                                        class="bg-gradient-to-br from-blue-400 to-blue-600 hover:bg-gradient-to-bl focus:ring-1 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-full text-xs px-2 text-center !text-white py-1.5"
+                                        @click="onPromptHintClick(hint)"
+                                      >
+                                        {{ hint.name }}
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <p
+                                    v-if="createPromptError['ai_template']"
+                                    class="!text-red-500 text-xs italic"
+                                  >
+                                    {{ createPromptError["ai_template"] }}
+                                  </p>
+                                </div>
+                              </div>
+                              <div
+                                v-for="(hint, index) in promptHints"
+                                class="w-full max-w-2xl px-3 py-4 !bg-white rounded-lg shadow-md"
+                              >
+                                <div>
+                                  <div class="flex">
+                                    <div class="w-4/12">
+                                      <label
+                                        for="first-name"
+                                        class="block text-sm font-medium leading-6 text-gray-900"
+                                        >Prompt Hint</label
+                                      >
+                                      <div>
+                                        <input
+                                          v-model="hint.name"
+                                          :disabled="
+                                            hint.disabled &&
+                                            isCreatePromptLoading
+                                          "
+                                          type="text"
+                                          class="placeholder:px-5 block w-full bg-gray-50 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-4"
+                                          :class="
+                                            hint.disabled
+                                              ? 'cursor-not-allowed !bg-gray-200'
+                                              : ''
+                                          "
+                                        />
+                                        <p
+                                          v-if="
+                                            createPromptError?.['hint_name']?.[
+                                              index
+                                            ]
+                                          "
+                                          class="!text-red-500 text-xs italic"
+                                        >
+                                          {{
+                                            createPromptError?.["hint_name"]?.[
+                                              index
+                                            ]
+                                          }}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div class="flex gap-3 ml-auto mt-2">
+                                      <PlusCircleIcon
+                                        @click="onAddPromptClick"
+                                        class="-mr-1 h-6 w-6 hover:fill-blue-200 hover:shadow-sm"
+                                        aria-hidden="true"
+                                      />
+                                      <TrashIcon
+                                        @click="onDeletePromptClick(index)"
+                                        class="-mr-1 h-6 w-6 hover:fill-blue-200 hover:shadow-sm"
+                                        aria-hidden="true"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div class="w-full mt-1">
+                                    <label
+                                      for="first-name"
+                                      class="block text-sm font-medium leading-6 text-gray-900"
+                                      >Prompt Hint Description
+                                    </label>
+                                    <div>
+                                      <input
+                                        v-model="hint.value"
+                                        :disabled="isCreatePromptLoading"
+                                        type="text"
+                                        name="first-name"
+                                        id="first-name"
+                                        autocomplete="given-name"
+                                        class="placeholder:px-5 block w-full bg-gray-50 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-4"
+                                        :class="
+                                          isCreatePromptLoading
+                                            ? 'bg-gray-200'
+                                            : null
+                                        "
+                                      />
+                                      <p
+                                        v-if="
+                                          createPromptError?.[
+                                            'hint_description'
+                                          ]?.[index]
+                                        "
+                                        class="!text-red-500 text-xs italic"
+                                      >
+                                        {{
+                                          createPromptError?.[
+                                            "hint_description"
+                                          ]?.[index]
+                                        }}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div class="w-full">
+                                <div
+                                  v-if="token"
+                                  class="mt-6 flex items-center justify-end gap-x-6"
+                                >
+                                  <button
+                                    :disabled="isCreatePromptLoading"
+                                    type="button"
+                                    class="rounded-md bg-gray-100 px-3 py-2 text-sm font-semibold shadow-sm hover:bg-gray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                                    @click="onCancelCreatePromptClick"
+                                  >
+                                    <svg
+                                      v-if="isCreatePromptLoading"
+                                      aria-hidden="true"
+                                      role="status"
+                                      class="inline mr-2 w-4 h-4 text-gray-200 animate-spin dark:text-gray-600 border-gray-100"
+                                      viewBox="0 0 100 101"
+                                      fill="none"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+                                        fill="currentColor"
+                                      ></path>
+                                      <path
+                                        d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                                        fill="rgb(229 231 235)"
+                                      ></path>
+                                    </svg>
+                                    Cancel
+                                  </button>
+                                  <button
+                                    :disabled="isCreatePromptLoading"
+                                    type="submit"
+                                    class="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold !text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                                    @click="onCreatePromptClick"
+                                  >
+                                    <svg
+                                      v-if="isCreatePromptLoading"
+                                      aria-hidden="true"
+                                      role="status"
+                                      class="inline mr-2 w-4 h-4 text-gray-200 animate-spin dark:text-gray-600"
+                                      viewBox="0 0 100 101"
+                                      fill="none"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+                                        fill="currentColor"
+                                      ></path>
+                                      <path
+                                        d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                                        fill="#1C64F2"
+                                      ></path>
+                                    </svg>
+                                    Save
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                    <div class="flex text-center text-md">
-                      <div class="inline-flex gap-x-1.5 cursor-pointer">
-                        <ChevronLeftIcon
-                          class="-mr-1 h-4 w-4 text-gray-400 self-center"
-                          aria-hidden="true"
-                        />
-                        Previous
-                      </div>
-                      <div class="flex-grow">2/10000 prompts</div>
-                      <div class="inline-flex gap-x-1.5 cursor-pointer">
-                        Next
-                        <ChevronRightIcon
-                          class="-mr-1 h-4 w-4 text-gray-400 self-center"
-                          aria-hidden="true"
-                        />
-                      </div>
-                    </div>
+                    </TransitionRoot>
                   </div>
                 </TabPanel>
                 <TabPanel :key="2">
                   <div>
-                    <div class="flex-grow overflow-y-auto">hi</div>
-                    <div
+                    <div class="flex-grow overflow-y-auto">hi hello</div>
+                    <div class="w-full absolute bottom-0 flex mb-12">
+                      <div class="relative w-full bg-gray-50">
+                        <div
+                          class="overflow-hidden rounded-lg border border-gray-300 shadow-sm focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500"
+                        >
+                          <div v-if="selectedPrompt.key" class="my-2">
+                            <span
+                              class="bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full mx-2 my-6"
+                              >{{ selectedPrompt?.name }}
+                            </span>
+                          </div>
+
+                          <textarea
+                            v-model="questionInput"
+                            :disabled="isLoading"
+                            ref="messageInput"
+                            id="message-input"
+                            rows="2"
+                            name="description"
+                            class="outline-none bg-gray-50 block px-2 w-full resize-none border-0 py-0 text-gray-900 placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6 mb-[-2px]"
+                            :class="isLoading ? 'cursor-wait' : ''"
+                            :placeholder="
+                              !isLoading ? 'Ask a question...' : 'Loading...'
+                            "
+                            @input="adjustHeight"
+                          />
+
+                          <!-- Spacer element to match the height of the toolbar -->
+                          <div aria-hidden="true">
+                            <div class="">
+                              <div class="" />
+                            </div>
+                            <div class="h-px" />
+                            <div class="py-2">
+                              <div class="py-px">
+                                <div class="h-9" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="absolute inset-x-px bottom-0">
+                          <!-- Actions: These are just examples to demonstrate the concept, replace/wire these up however makes sense for your project. -->
+                          <!-- <div
+                                        class="flex flex-nowrap justify-end space-x-2 px-2 py-2 sm:px-3"
+                                      >
+                                        hi
+                                      </div> -->
+                          <div
+                            class="flex items-center justify-between space-x-3 border-t border-gray-200 px-2 py-2 sm:px-3 bg-white"
+                          >
+                            <div class="flex flex-wrap gap-2">
+                              <!-- <button
+                                            type="button"
+                                            class="group -my-2 -ml-2 inline-flex items-center rounded-full px-3 py-2 text-left text-gray-400"
+                                          >
+                                            <PaperClipIcon
+                                              class="-ml-1 mr-2 h-5 w-5 group-hover:text-gray-500"
+                                              aria-hidden="true"
+                                            />
+                                          </button> -->
+                              <Listbox
+                                as="div"
+                                v-model="assigned"
+                                class="flex-shrink-0"
+                              >
+                                <ListboxLabel class="sr-only"
+                                  >Language</ListboxLabel
+                                >
+                                <div class="relative">
+                                  <ListboxButton
+                                    class="relative inline-flex items-center whitespace-nowrap rounded-full bg-blue-100 px-0.5 py-0.5 text-sm font-medium text-gray-500 hover:bg-blue-200 sm:px-3"
+                                  >
+                                    <span
+                                      :class="[
+                                        assigned.value === null
+                                          ? ''
+                                          : 'text-gray-900',
+                                        'hidden truncate sm:block',
+                                      ]"
+                                      >{{
+                                        assigned.value === null
+                                          ? "Assign"
+                                          : assigned.name
+                                      }}</span
+                                    >
+                                  </ListboxButton>
+
+                                  <transition
+                                    leave-active-class="transition ease-in duration-100"
+                                    leave-from-class="opacity-100"
+                                    leave-to-class="opacity-0"
+                                  >
+                                    <ListboxOptions
+                                      class="absolute bottom-full left-0 z-10 mt-1 max-h-56 w-52 overflow-auto rounded-lg bg-white py-3 text-base shadow ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+                                    >
+                                      <ListboxOption
+                                        as="template"
+                                        v-for="assignee in assignees"
+                                        :key="assignee.value"
+                                        :value="assignee"
+                                        v-slot="{ active }"
+                                      >
+                                        <li
+                                          :class="[
+                                            active ? 'bg-gray-100' : 'bg-white',
+                                            'relative cursor-default select-none px-3 py-2',
+                                          ]"
+                                        >
+                                          <div class="flex items-center">
+                                            <span
+                                              class="ml-3 block truncate font-medium"
+                                              >{{ assignee.name }}</span
+                                            >
+                                          </div>
+                                        </li>
+                                      </ListboxOption>
+                                    </ListboxOptions>
+                                  </transition>
+                                </div>
+                              </Listbox>
+
+                              <Listbox
+                                as="div"
+                                v-model="labelled"
+                                class="flex-shrink-0"
+                              >
+                                <ListboxLabel class="sr-only"
+                                  >Add a label</ListboxLabel
+                                >
+                                <div class="relative">
+                                  <ListboxButton
+                                    class="relative inline-flex items-center whitespace-nowrap rounded-full bg-blue-100 px-0.5 py-0.5 text-sm font-medium text-gray-500 hover:bg-blue-200 sm:px-3"
+                                  >
+                                    <span
+                                      :class="[
+                                        labelled.value === null
+                                          ? ''
+                                          : 'text-gray-900',
+                                        'hidden truncate  sm:block',
+                                      ]"
+                                      >{{
+                                        labelled.value === null
+                                          ? "Label"
+                                          : labelled.name
+                                      }}</span
+                                    >
+                                  </ListboxButton>
+
+                                  <transition
+                                    leave-active-class="transition ease-in duration-100"
+                                    leave-from-class="opacity-100"
+                                    leave-to-class="opacity-0"
+                                  >
+                                    <ListboxOptions
+                                      class="absolute bottom-full right-0 z-10 mt-1 max-h-56 w-52 overflow-auto rounded-lg bg-white py-3 text-base shadow ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+                                    >
+                                      <ListboxOption
+                                        as="template"
+                                        v-for="label in labels"
+                                        :key="label.value"
+                                        :value="label"
+                                        v-slot="{ active }"
+                                      >
+                                        <li
+                                          :class="[
+                                            active ? 'bg-gray-100' : 'bg-white',
+                                            'relative cursor-default select-none px-3 py-2',
+                                          ]"
+                                        >
+                                          <div class="flex items-center">
+                                            <span
+                                              class="block truncate font-medium"
+                                              >{{ label.name }}</span
+                                            >
+                                          </div>
+                                        </li>
+                                      </ListboxOption>
+                                    </ListboxOptions>
+                                  </transition>
+                                </div>
+                              </Listbox>
+
+                              <Listbox
+                                as="div"
+                                v-model="labelled"
+                                class="flex-shrink-0"
+                              >
+                                <ListboxLabel class="sr-only"
+                                  >Add a label
+                                </ListboxLabel>
+                                <div class="relative">
+                                  <ListboxButton
+                                    class="relative inline-flex items-center whitespace-nowrap rounded-full bg-blue-100 px-0.5 py-0.5 text-sm font-medium text-gray-500 hover:bg-blue-200 sm:px-3"
+                                  >
+                                    <span
+                                      :class="[
+                                        labelled.value === null
+                                          ? ''
+                                          : 'text-gray-900',
+                                        'hidden truncate  sm:block',
+                                      ]"
+                                      >{{
+                                        labelled.value === null
+                                          ? "Label"
+                                          : labelled.name
+                                      }}</span
+                                    >
+                                  </ListboxButton>
+
+                                  <transition
+                                    leave-active-class="transition ease-in duration-100"
+                                    leave-from-class="opacity-100"
+                                    leave-to-class="opacity-0"
+                                  >
+                                    <ListboxOptions
+                                      class="absolute bottom-full right-0 z-10 mt-1 max-h-56 w-52 overflow-auto rounded-lg bg-white py-3 text-base shadow ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+                                    >
+                                      <ListboxOption
+                                        as="template"
+                                        v-for="label in labels"
+                                        :key="label.value"
+                                        :value="label"
+                                        v-slot="{ active }"
+                                      >
+                                        <li
+                                          :class="[
+                                            active ? 'bg-gray-100' : 'bg-white',
+                                            'relative cursor-default select-none px-3 py-2',
+                                          ]"
+                                        >
+                                          <div class="flex items-center">
+                                            <span
+                                              class="block truncate font-medium"
+                                              >{{ label.name }}</span
+                                            >
+                                          </div>
+                                        </li>
+                                      </ListboxOption>
+                                    </ListboxOptions>
+                                  </transition>
+                                </div>
+                              </Listbox>
+                            </div>
+                            <div class="flex-shrink-0">
+                              <PaperAirplaneIcon
+                                class="h-5 w-5 fill-gray-400"
+                                aria-hidden="true"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- <div
                       class="flex relative w-full bg-white-100 border-t-1 border-slate-400 flex-shrink-0 mt-auto"
                       style="
                         border-top: solid;
@@ -1445,12 +2434,12 @@ onBeforeUnmount(() => {
                         required
                         @input="adjustHeight"
                       />
+
                       <button
                         v-if="!isLoading"
                         class="flex bg-white cursor-pointer border-none items-center justify-center mx-2 active:scale-95 focus:outline-none"
                         @click="onSendClick"
                       >
-                        <!-- Replace this with your send icon -->
                         <img
                           src="/assets/tabler-send.svg"
                           class="text-slate-700 text-lg w-5 h-5 focus:text-blue-500 hover:text-blue-300"
@@ -1479,7 +2468,7 @@ onBeforeUnmount(() => {
                           />
                         </svg>
                       </button>
-                    </div>
+                    </div> -->
                   </div>
                 </TabPanel>
               </TabPanels>
@@ -1557,11 +2546,11 @@ onBeforeUnmount(() => {
       </TransitionChild>
     </TransitionRoot>
     <div
-      :style="{ right: `${right}px`, bottom: `${bottom}px` }"
-      class="fixed flex right-0 bottom-0 m-5 z-100 flex items-end font-sans leading-1em"
+      :style="{ bottom: `${bottom}px` }"
+      class="fixed flex right-0 bottom-0 m-3 z-[999999] items-end font-sans leading-1em"
     >
       <button
-        class="flex rounded-full cursor-pointer border-none bg-transparent"
+        class="flex rounded-full cursor-pointer border-none bg-white focus:bg-gray-50"
         id="respond-buddy-fba-button"
         ref="fbaButton"
         @mousedown.prevent="dragStart"
@@ -1570,6 +2559,7 @@ onBeforeUnmount(() => {
         <img
           src="/assets/rb-icon-2.png"
           class="text-lg"
+          alt="Respond Buddy"
           style="
             width: 50px;
             padding-top: 3px;
@@ -1668,9 +2658,8 @@ onBeforeUnmount(() => {
   position: fixed;
   top: 0;
   right: 0;
-  width: 500px;
   height: 100%;
-  z-index: 9999;
+  z-index: 9999999999;
   display: flex;
   align-items: center;
   justify-content: end;
@@ -1678,7 +2667,7 @@ onBeforeUnmount(() => {
 
 .sidebar {
   background-color: white;
-  width: 100%;
+  width: 500px;
   height: 99%;
   overflow-y: auto;
   border-radius: 12px;
@@ -1692,7 +2681,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   background-color: rgba(0, 0, 0, 0.3);
-  z-index: 9998;
+  z-index: 9999999999;
 }
 
 .expand-on-hover {
@@ -1701,5 +2690,51 @@ onBeforeUnmount(() => {
 
 .expand-on-hover:hover {
   transform: scale(1.2);
+}
+
+.gradient-border {
+  @apply relative p-2;
+
+  /* The actual gradient border */
+  &::before {
+    content: "";
+    @apply absolute top-0 left-0 w-full h-full z-10;
+    background: linear-gradient(
+      to right,
+      rgb(96 165 250),
+      #2563eb
+    ); /* Change gradient colors as needed */
+    border-radius: inherit; /* If your element has rounded corners */
+    z-index: -1;
+    box-sizing: border-box; /* To have consistent sizing */
+    /* Adjust width and height for the border effect */
+    width: calc(100% + 4px);
+    height: calc(100% + 4px);
+    transform: translate(
+      -2px,
+      -2px
+    ); /* Half of the total width and height adjustments */
+  }
+}
+
+.prompt-card {
+  @apply relative p-2;
+
+  /* The actual gradient border */
+  &::before {
+    content: "";
+    @apply absolute top-0 left-0 w-full h-full z-10;
+    background: linear-gradient(to right, var(--tw-gradient-stops));
+    border-radius: inherit; /* If your element has rounded corners */
+    z-index: -1;
+    box-sizing: border-box; /* To have consistent sizing */
+    /* Adjust width and height for the border effect */
+    width: calc(100% + 4px);
+    height: calc(100% + 4px);
+    transform: translate(
+      -2px,
+      -2px
+    ); /* Half of the total width and height adjustments */
+  }
 }
 </style>
