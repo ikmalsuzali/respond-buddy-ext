@@ -34,17 +34,8 @@ export async function getManifest() {
       48: "./assets/rb-icon.png",
       128: "./assets/rb-icon.png",
     },
-    permissions: [
-      "storage",
-      "activeTab",
-      "contextMenus",
-      "tabs",
-      "declarativeNetRequest",
-      "declarativeNetRequestWithHostAccess",
-    ],
-
-    host_permissions: ["*://chat.openai.com/*"],
-
+    permissions: ["storage", "activeTab", "contextMenus", "tabs"],
+    host_permissions: [],
     content_scripts: [
       {
         matches: ["<all_urls>"],
@@ -62,15 +53,6 @@ export async function getManifest() {
         matches: ["<all_urls>"],
       },
     ],
-    declarative_net_request: {
-      rule_resources: [
-        {
-          id: "ruleset_1",
-          enabled: true,
-          path: "assets/rules.json",
-        },
-      ],
-    },
     content_security_policy: {
       extension_pages: isDev
         ? // this is required on dev for Vite script to load
