@@ -11,6 +11,7 @@ import fileInfoSvg from "../../assets/file-info.svg";
 import languageSvg from "../../assets/language.svg";
 import messageQuestionSvg from "../../assets/message-question.svg";
 import oneTwoThreeSvg from "../../assets/onetwothree.svg";
+import useUrlWatcher from "../composables/useUrlWatcher";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -23,9 +24,11 @@ import {
 import {
   TrashIcon,
   PlusCircleIcon,
+  DocumentMinusIcon,
   HeartIcon as HeartOutlineIcon,
   ChartBarIcon,
 } from "@heroicons/vue/24/outline";
+
 import {
   Listbox,
   ListboxButton,
@@ -54,13 +57,116 @@ import {
   TransitionRoot,
 } from "@headlessui/vue";
 import HomeTabPanel from "./HomeTabPanel.vue";
+import useHtmlEmbeddings from "../composables/useHtmlEmbedding";
+import ButtonGroup from "./ButtonGroup.vue";
+
+const { url: currentUrl } = useUrlWatcher();
+const {
+  embedImages,
+  embedWeb,
+  documentImages,
+  documentWeb,
+  embedChatGPT,
+  listenAndAppendRequestPayload,
+} = useHtmlEmbeddings();
+
+let prevUrl = ref("");
+
+watchEffect(() => {
+  // check if the url has changed
+
+  if (currentUrl.value !== prevUrl.value) {
+    nextTick(() => {
+      setTimeout(() => {
+        embedWeb(currentUrl.value);
+        embedChatGPT();
+        listenAndAppendRequestPayload("chat.openai.com/backend-api", "");
+      }, 1000);
+    });
+    prevUrl.value = currentUrl.value;
+  }
+});
+
+document.addEventListener("click", function (event) {
+  console.log("🚀 ~ file: App.vue:91 ~ event:", event);
+  const sendButton = document.querySelector('[data-testid="send-button"]');
+
+  if (sendButton?.contains(event.target)) {
+    const textArea = document.querySelector("#prompt-textarea");
+
+    if (textArea) {
+      console.log(
+        "🚀 ~ file: App.vue:101 ~ sendButton.addEventListener ~ textArea:",
+        textArea
+      );
+      textArea.value = "hi how are you";
+      textArea.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    console.log("send button clicked");
+    return;
+  }
+});
+
+const nativeFetch = window.fetch;
+window.fetch = async (...args) => {
+  console.log("detected fetch call");
+  return nativeFetch.apply(window, args);
+};
 
 const promptRoute = ref("listing");
 
+const onAskMeAnythingClick = () => {
+  console.log("onAskMeAnythingClick");
+  selectedTab.value = 2;
+  nextTick(() => {
+    messageInput.value.focus();
+  });
+};
+
+const onHomePromptClick = (prompt: any) => {
+  selectedPrompt.value = {
+    key: prompt.key,
+    name: prompt.name,
+  };
+  selectedTab.value = 2;
+  nextTick(() => {
+    messageInput.value.focus();
+  });
+};
+
 const selectedPrompt = ref({
-  key: "summarize",
-  name: "Summarize",
+  key: "",
+  name: "",
 });
+
+const sendMessageRequestData = ref({
+  message: "",
+  metadata: {
+    tag_tone: "",
+    tag_writing_style: "",
+    tag_language: "",
+    tag_key: "",
+    current_website_url: "",
+    url_body_content: "",
+  },
+});
+
+const onRemoveSelectedPromptClick = () => {
+  selectedPrompt.value = {
+    key: "",
+    name: "",
+  };
+};
+
+const onPromptClick = (prompt: any) => {
+  selectedPrompt.value = {
+    key: prompt.key,
+    name: prompt.name,
+  };
+
+  selectedTab.value = 2;
+};
 
 const publishingOptions = [
   {
@@ -99,6 +205,7 @@ const sortByMenuItems = ref([
 ]);
 
 const isPromptsLoading = ref(true);
+const selectedTab = ref(0);
 
 const categoryItems = [
   {
@@ -156,6 +263,10 @@ const dated = ref(dueDates[0]);
 const currentCategoryItem = ref(categoryItems[0]);
 const onFilterCategoryItem = (item: any) => {
   currentCategoryItem.value = item;
+  promptsRequestData.value = {
+    ...promptsRequestData.value,
+    category: item.id,
+  };
 };
 
 const promptHints = ref([
@@ -187,6 +298,8 @@ const removeDescriptionsBasedOnArray = (
   description: string,
   matchStrings: any
 ) => {
+  if (!matchStrings) return description;
+  if (matchStrings.length === 0) return description;
   if (!description) return "";
 
   matchStrings.forEach((matchString: string) => {
@@ -198,9 +311,10 @@ const removeDescriptionsBasedOnArray = (
 
 const getCurrentAmount = (page: number, limit: number) => {
   const startIndex = (page - 1) * limit;
-  const endIndex = startIndex + limit;
-  const currentPrompts = promptsData.value.prompts.slice(startIndex, endIndex);
-  return currentPrompts.length;
+  const count = startIndex + promptsData.value.prompts.length;
+  // const endIndex = startIndex + limit;
+  // const currentPrompts = promptsData.value.prompts.slice(startIndex, endIndex);
+  return count;
 };
 
 const selected = ref(publishingOptions[0]);
@@ -209,7 +323,7 @@ const promptsRequestData = ref({
   category: "",
   sort_by: "top_usage",
   page: 1,
-  limit: 50,
+  limit: 20,
 });
 
 const createPromptRequestData = ref({
@@ -226,7 +340,7 @@ const debouncedPromptQuery = useDebounce(promptSearch, 300);
 
 const promptsData = ref({
   prompts: [],
-  limit: 50,
+  limit: 20,
   page: 1,
   total: 0,
   totalPages: 2,
@@ -325,7 +439,6 @@ let startX = 0;
 let startY = 0;
 
 let messageData = ref([]);
-let questionInput = ref("");
 let selectedText = ref("");
 let selectionOffsetTop = ref(0);
 let selectionOffsetLeft = ref(0);
@@ -344,45 +457,45 @@ let toolbarItems = ref([
     icon: messageQuestionSvg,
     template: "Respond to: ",
   },
-  {
-    key: "translate",
-    name: "Translate",
-    icon: languageSvg,
-    options: [
-      {
-        key: "english",
-        name: "English",
-        template: "Translate to English: ",
-      },
-      {
-        key: "spanish",
-        name: "Spanish",
-        template: "Translate to Spanish: ",
-      },
-      {
-        key: "french",
-        name: "French",
-        template: "Translate to French: ",
-      },
-      {
-        key: "german",
-        name: "German",
-        template: "Translate to German: ",
-      },
-      {
-        key: "italian",
-        name: "Italian",
-        template: "Translate to Italian: ",
-      },
-      // {
-      //   key: "chinese",
-      //   name: "Chinese",
-      //   template: "Translate to Cfhinese: ",
-      // },
-    ],
-    isHovered: false,
-    isDropdownOpen: false,
-  },
+  // {
+  //   key: "translate",
+  //   name: "Translate",
+  //   icon: languageSvg,
+  //   options: [
+  //     {
+  //       key: "english",
+  //       name: "English",
+  //       template: "Translate to English: ",
+  //     },
+  //     {
+  //       key: "spanish",
+  //       name: "Spanish",
+  //       template: "Translate to Spanish: ",
+  //     },
+  //     {
+  //       key: "french",
+  //       name: "French",
+  //       template: "Translate to French: ",
+  //     },
+  //     {
+  //       key: "german",
+  //       name: "German",
+  //       template: "Translate to German: ",
+  //     },
+  //     {
+  //       key: "italian",
+  //       name: "Italian",
+  //       template: "Translate to Italian: ",
+  //     },
+  //     // {
+  //     //   key: "chinese",
+  //     //   name: "Chinese",
+  //     //   template: "Translate to Cfhinese: ",
+  //     // },
+  //   ],
+  //   isHovered: false,
+  //   isDropdownOpen: false,
+  // },
   {
     key: "simplify",
     name: "Simplify",
@@ -477,18 +590,35 @@ const onClickToolbarItem = async (index: any) => {
 
   toggle(true);
 
+  selectedTab.value = 2;
   // If the toolbar item is "copy", don't send a message to the background script
   if (toolbarItems.value[index]?.key === "copy") {
     await navigator.clipboard.writeText(selectedText.value);
-    questionInput.value = selectedText.value;
+    sendMessageRequestData.value.message = selectedText.value;
     adjustHeight();
     return;
   }
 
-  // If the toolbar item has template, send a message to the background script
-  await sendMessage("ask-chat", {
-    message: `${toolbarItems.value[index]?.template}${selectedText.value}`,
+  nextTick(() => {
+    selectedPrompt.value = {
+      key: toolbarItems.value[index]?.key,
+      name: toolbarItems.value[index]?.name,
+    };
+
+    console.log(
+      "🚀 ~ file: App.vue:519 ~ nextTick ~ selectedPrompt.value :",
+      selectedPrompt.value
+    );
+
+    sendMessageRequestData.value.message = selectedText.value;
+    messageInput.value.focus();
+    adjustHeight();
   });
+
+  // If the toolbar item has template, send a message to the background script
+  // await sendMessage("ask-chat", {
+  //   message: `${toolbarItems.value[index]?.template}${selectedText.value}`,
+  // });
 };
 
 const startSidebarDrag = (event: any) => {
@@ -533,11 +663,18 @@ let socialMediaShareMessage = ref([
   "Imagine having a tool that can summarize or expand any text online. Well, I found it! I think you'll love it as much as I do. 😍",
 ]);
 
-watch(questionInput, () => {
+// watch sendMessageRequestData.value.message
+watch(sendMessageRequestData.value.message, () => {
   adjustHeight();
 });
 
 const onNextPageClick = () => {
+  if (
+    getCurrentAmount(promptsData.value.page, promptsData.value.limit) ===
+    promptsData.value.total
+  )
+    return;
+
   if (promptsData.value.page < promptsData.value.totalPages) {
     promptsRequestData.value = {
       ...promptsRequestData.value,
@@ -601,8 +738,13 @@ const shareToSocialMedia = (platform: string, content?: any = {}) => {
   window.open(shareUrl, "_blank");
 };
 
-const onHeartClick = (prompt) => {
-  prompt.isLiked = !prompt.isLiked;
+const onHeartClick = (prompt: any) => {
+  prompt.user_has_liked = !prompt.user_has_liked;
+
+  sendMessage("set-liked-prompt", {
+    id: prompt.id,
+    isLiked: prompt.user_has_liked,
+  });
 };
 
 const createPromptError = ref({
@@ -616,8 +758,13 @@ onMessage("toggle-chat", (_) => {
   toggle(true);
 });
 
+// onMessage("url-changed", (message) => {
+//   console.log("🚀 ~ file: app.ts:15 ~ onMessage ~ message:", message);
+// });
+
 onMessage("app-message", (message) => {
-  toggle(true);
+  // promptRoute.value = "";
+  selectedTab.value = 2;
 
   if (message?.data?.appMessages?.update === true) {
     // Get last messageData index where appMessages senderId is null
@@ -650,28 +797,36 @@ onMessage("tab-updated", (message) => {
 });
 
 const updateInput = (value: string) => {
-  questionInput.value = value;
+  sendMessageRequestData.value.message = value;
 };
 
 const onSendClick = async () => {
-  const message = questionInput.value;
-
-  if (!message) {
+  if (!sendMessageRequestData.value.message) {
     return;
   }
+
+  console.log("send message", sendMessageRequestData.value);
 
   let response = await sendMessage(
     "ask-chat",
     {
-      message,
+      message: sendMessageRequestData.value.message,
       metadata: {
+        tag_writing_style:
+          sendMessageRequestData.value?.metadata?.tag_writing_style || "",
+        tag_language:
+          sendMessageRequestData.value?.metadata?.tag_language || "",
+        tag_tone: sendMessageRequestData.value?.metadata?.tag_tone || "",
+        tag_key: selectedPrompt.value?.key || "",
         current_website_url: window.location.href,
-        url_body_content: document.body.innerText,
+        url_body_content: !selectedPrompt.value?.key
+          ? document.body.innerText
+          : "",
       },
     },
     "background"
   );
-  questionInput.value = "";
+  sendMessageRequestData.message.value = "";
 
   adjustHeight();
 
@@ -721,9 +876,14 @@ watch(promptsRequestData, async () => {
   await fetchTemplates(promptsRequestData.value);
 });
 
+const updatePromptRoute = (route: string) => {
+  promptRoute.value = route;
+};
+
 const fetchTemplates = async (templateData = {}) => {
   isPromptsLoading.value = true;
   const data = await sendMessage("get-templates-api", templateData);
+  console.log("🚀 ~ file: App.vue:794 ~ fetchTemplates ~ data:", data);
 
   promptsData.value = {
     prompts: data?.data || [],
@@ -739,9 +899,33 @@ const fetchTemplates = async (templateData = {}) => {
 const promptCategoriesData = ref([]);
 
 const fetchTemplateCategories = async (name: string = "") => {
-  const data = await sendMessage("get-template-categories-api", name);
-  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
+  const data = await sendMessage("fetch-template-categories-api", name);
+  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data: categories", data);
   promptCategoriesData.value = data || [];
+};
+
+const promptLanguagesData = ref([]);
+
+const fetchTemplateLanguages = async (name: string = "") => {
+  const data = await sendMessage("fetch-template-languages", name);
+  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
+  promptLanguagesData.value = data || [];
+};
+
+const promptTonesData = ref([]);
+
+const fetchTemplateTones = async (name: string = "") => {
+  const data = await sendMessage("fetch-template-tones", name);
+  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
+  promptTonesData.value = data || [];
+};
+
+const promptWritingStylesData = ref([]);
+
+const fetchTemplateWritingStyles = async (name: string = "") => {
+  const data = await sendMessage("fetch-template-writing-styles", name);
+  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
+  promptWritingStylesData.value = data || [];
 };
 
 const scrollToBottomInChatLog = () => {};
@@ -805,11 +989,6 @@ const onCreatePromptClick = async () => {
     ai_template: "",
   };
 
-  console.log(
-    "🚀 ~ file: App.vue:826 ~ onCreatePromptClick ~ createPromptRequestData:",
-    createPromptRequestData.value
-  );
-
   let hasError = ref(false);
 
   // Handle errors
@@ -848,7 +1027,7 @@ const onCreatePromptClick = async () => {
       };
       hasError.value = true;
     }
-    if (!value?.description) {
+    if (!value?.description && !key) {
       createPromptError.value = {
         ...createPromptError.value,
         hint_description: {
@@ -863,8 +1042,6 @@ const onCreatePromptClick = async () => {
 
   console.log(createPromptError.value);
 
-  isCreatePromptLoading.value = false;
-
   if (hasError.value === true) {
     console.log(
       "🚀 ~ file: App.vue:859 ~ onCreatePromptClick ~ hasError:",
@@ -878,6 +1055,8 @@ const onCreatePromptClick = async () => {
     "create-prompt",
     createPromptRequestData.value
   );
+
+  isCreatePromptLoading.value = false;
 
   console.log(data);
 
@@ -1144,13 +1323,29 @@ const handleZoomChange = () => {
   startY *= zoomLevel;
 };
 
+const limitArrayLength = (array: Array<any>, maxLength: number) => {
+  if (array.length > maxLength) {
+    return array.slice(0, maxLength);
+  }
+  return array;
+};
+
+const homePagePrompts = computed(() => {
+  if (!promptsData.value?.prompts) return [];
+  if (promptsData.value?.prompts?.length < 20)
+    return promptsData.value?.prompts;
+  return limitArrayLength(promptsData.value.prompts, 20);
+});
+
 onMounted(() => {
   getToken();
   getFontSize();
   getChatButtonPosition();
-  getTemplates();
   fetchTemplates();
   fetchTemplateCategories();
+  fetchTemplateLanguages();
+  fetchTemplateTones();
+  fetchTemplateWritingStyles();
   // addHoverStyles();
   // renderImageIconButton();
   // onSettingsInit();
@@ -1233,11 +1428,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
-    <teleport :to="teleportTarget">
-      <div v-if="teleportTarget !== 'body'" :style="currentConfig?.style || {}">
-        <h1>Hello from the other side</h1>
-      </div>
-    </teleport>
+    {{ documentWeb }}
+    <div v-for="webComponent in documentWeb">
+      <teleport to="#embed-web-0">
+        <div :style="webComponent?.style">
+          <ButtonGroup :prompts="webComponent?.actions" />
+        </div>
+      </teleport>
+    </div>
     <div
       v-if="isSelectionShow"
       :style="{
@@ -1250,7 +1448,7 @@ onBeforeUnmount(() => {
         }`,
       }"
       style="z-index: 9999999999; background-color: white"
-      class="popup border border-gray-300 shadow-md rounded-lg flex p-1"
+      class="popup border border-gray-300 shadow-md rounded-lg flex p-1 space-x-2"
     >
       <!-- Add toolbar buttons or items here -->
       <button
@@ -1270,10 +1468,10 @@ onBeforeUnmount(() => {
         <!-- Tooltip -->
         <span
           v-if="item.isHovered"
-          class="px-1 text-xs text-gray-100 rounded-md absolute left-1/2 -translate-x-1/2 translate-y-full"
+          class="px-1 text-xs text-gray-100 rounded-md absolute left-1/2 -translate-x-1/2 translate-y-1/2"
           style="
             background-color: #448aff;
-            --un-translate-y: 200%;
+            --un-translate-y: 100%;
             padding: 2px;
             color: white;
           "
@@ -1312,20 +1510,22 @@ onBeforeUnmount(() => {
           ></div>
 
           <div class="w-full h-full px-2 sm:px-0 self-center">
-            <TabGroup>
-              <TabPanels class="">
+            <TabGroup :selectedIndex="selectedTab">
+              <TabPanels class="h-full">
                 <TabPanel :key="0">
                   <HomeTabPanel
                     :token="token"
                     :settings="settings"
-                    :prompts="promptsData.prompts"
+                    :prompts="homePagePrompts"
+                    @on-ask-me-anything-click="onAskMeAnythingClick"
+                    @on-prompt-click="onHomePromptClick"
                   />
                 </TabPanel>
-                <TabPanel :key="1" class="flex flex-col">
-                  <div>
+                <TabPanel :key="1" class="flex flex-col h-full">
+                  <div class="flex-grow flex overflow-y-auto w-full">
                     <div
                       v-if="promptRoute == 'listing'"
-                      class="px-6 space-y-3 overflow-y-auto mb-14"
+                      class="px-6 space-y-3 overflow-y-auto mb-14 w-full"
                     >
                       <div class="flex my-4">
                         <div class="font-bold text-xl w-full">Prompts</div>
@@ -1445,11 +1645,11 @@ onBeforeUnmount(() => {
                             leave-to-class="transform opacity-0 scale-95"
                           >
                             <MenuItems
-                              class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                              class="absolute left-0 z-10 mt-2 w-56 max-h-52 overflow-auto origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
                             >
                               <div class="py-1">
                                 <MenuItem
-                                  v-for="item in categoryItems"
+                                  v-for="item in promptCategoriesData"
                                   v-slot="{ active }"
                                 >
                                   <a
@@ -1472,7 +1672,7 @@ onBeforeUnmount(() => {
                       <div class="flex flex-wrap gap-4 place-content-center">
                         <div
                           v-if="isPromptsLoading"
-                          class="w-full flex flex-wrap gap-4"
+                          class="w-full flex flex-wrap gap-4 justify-between"
                         >
                           <div
                             v-for="_ in 5"
@@ -1508,13 +1708,27 @@ onBeforeUnmount(() => {
                           </div>
                         </div>
                         <div
+                          v-else-if="
+                            !isPromptsLoading &&
+                            promptsData.prompts.length === 0
+                          "
+                          class="p-4"
+                        >
+                          <DocumentMinusIcon
+                            class="w-20 p-2 stroke-[0.5]"
+                            style="margin-inline: auto"
+                          />
+                          <div>No records founds</div>
+                        </div>
+                        <div
                           v-else
-                          class="cursor-pointer min-w-[220px] max-w-[400px] sm:max-w-[400px] height-[312px] w-full"
+                          class="cursor-pointer flex-grow w-full min-w-[300px] max-w-[430px] height-[312px]"
                           v-for="prompt in promptsData.prompts"
                         >
                           <!-- Prompt Card -->
                           <div
-                            class="prompt-card shadow-md bg-gradient-to-r from-blue-400 to-blue-600 rounded-xl hover:shadow-xl h-full"
+                            class="prompt-card shadow-md bg-gradient-to-r from-blue-400 to-blue-600 hover:bg-gradient-to-bl rounded-xl hover:shadow-xl h-full"
+                            @click="onPromptClick(prompt)"
                           >
                             <div
                               class="bg-white rounded-xl shadow-md hover:shadow-lg flex items-center justify-between px-4 py-2 h-full"
@@ -1533,26 +1747,36 @@ onBeforeUnmount(() => {
                                   <div
                                     class="flex text-sm font-light text-gray-600 space-x-2"
                                   >
-                                    <p class="text-gray-600">Text Generation</p>
+                                    <p class="text-gray-600">
+                                      {{ prompt?.tag_categories?.name || "" }}
+                                    </p>
 
                                     <div class="flex gap-1">
                                       <ChartBarIcon
                                         class="w-5 hover:fill-grey-500"
                                       />
-                                      55.4k
+                                      <span class="pt-0.5">{{
+                                        prompt?.usage_count || 0
+                                      }}</span>
                                     </div>
                                     <div class="flex gap-1">
                                       <HeartOutlineIcon
-                                        v-if="!prompt?.isLiked"
-                                        @click="onHeartClick(prompt)"
+                                        v-if="!prompt?.user_has_liked"
+                                        @click.stop="onHeartClick(prompt)"
                                         class="w-5 hover:fill-red-200 hover:stroke-red-200"
                                       />
                                       <HeartOutlineIcon
                                         v-else
-                                        @click="onHeartClick(prompt)"
+                                        @click.stop="onHeartClick(prompt)"
                                         class="w-5 fill-red-400 stroke-red-400"
                                       />
-                                      55.4k
+                                      <span class="pt-0.5">
+                                        {{
+                                          (prompt?.user_has_liked === true
+                                            ? 1
+                                            : 0) + prompt?.tag_liked_count || 0
+                                        }}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
@@ -1565,9 +1789,10 @@ onBeforeUnmount(() => {
                         <div
                           class="inline-flex gap-x-1.5 cursor-pointer"
                           :class="{
-                            'cursor-not-allowed text-gray-300':
+                            'cursor-not-allowed text-gray-200':
                               promptsData.page == 1,
                           }"
+                          @click="onPreviousPageClick"
                         >
                           <ChevronLeftIcon
                             class="-mr-1 h-4 w-4 text-gray-800 self-center"
@@ -1576,13 +1801,12 @@ onBeforeUnmount(() => {
                               'cursor-not-allowed text-gray-300':
                                 promptsData.page == 1,
                             }"
-                            @click="onPreviousPageClick"
                           />
-                          Previous
+                          <div class="text-xs">Previous</div>
                         </div>
                         <!-- Get current records -->
 
-                        <div class="flex-grow">
+                        <div class="flex-grow text-xs">
                           {{
                             `${getCurrentAmount(
                               promptsData.page,
@@ -1594,7 +1818,7 @@ onBeforeUnmount(() => {
                           class="inline-flex gap-x-1.5 cursor-pointer"
                           @click="onNextPageClick"
                         >
-                          Next
+                          <div class="text-xs">Next</div>
                           <ChevronRightIcon
                             class="-mr-1 h-4 w-4 text-gray-300 self-center"
                             aria-hidden="true"
@@ -1607,9 +1831,6 @@ onBeforeUnmount(() => {
                       enter="transition-opacity duration-500"
                       enter-from="opacity-0"
                       enter-to="opacity-100"
-                      leave="transition-opacity duration-500"
-                      leave-from="opacity-100"
-                      leave-to="opacity-0"
                     >
                       <div class="space-y-12">
                         <div
@@ -1669,7 +1890,13 @@ onBeforeUnmount(() => {
                               </div>
                             </div> -->
                           <div class="flex-1 md:flex-2 px-12 py-8">
-                            <div>
+                            <div class="flex">
+                              <div @click="updatePromptRoute('listing')">
+                                <ChevronLeftIcon
+                                  class="mr-2 pt-1 h-6 w-6 text-gray-400"
+                                  aria-hidden="true"
+                                />
+                              </div>
                               <h2 class="text-xl font-bold mb-4">
                                 Create a Custom Prompt
                               </h2>
@@ -1687,7 +1914,7 @@ onBeforeUnmount(() => {
                                 <button
                                   @click="onClickLoginRegister('login')"
                                   type="button"
-                                  class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                                  class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-sm px-5 py-2 text-center mr-2 mb-2 border-none"
                                   style="color: white"
                                 >
                                   Login
@@ -1695,7 +1922,7 @@ onBeforeUnmount(() => {
                                 <button
                                   @click="onClickLoginRegister('register')"
                                   type="button"
-                                  class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
+                                  class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-sm px-5 py-2 text-center mr-2 mb-2 border-none"
                                   style="color: white"
                                 >
                                   Register
@@ -1971,7 +2198,7 @@ onBeforeUnmount(() => {
                                           (hint) => hint.name !== ''
                                         )"
                                         type="button"
-                                        class="bg-gradient-to-br from-blue-400 to-blue-600 hover:bg-gradient-to-bl focus:ring-1 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-full text-xs px-2 text-center !text-white py-1.5"
+                                        class="bg-gradient-to-br from-blue-400 to-blue-600 hover:bg-gradient-to-bl focus:ring-1 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-full px-2 text-center !text-white text-xs"
                                         @click="onPromptHintClick(hint)"
                                       >
                                         {{ hint.name }}
@@ -2125,12 +2352,12 @@ onBeforeUnmount(() => {
                                       role="status"
                                       class="inline mr-2 w-4 h-4 text-gray-200 animate-spin dark:text-gray-600"
                                       viewBox="0 0 100 101"
-                                      fill="none"
+                                      fill="white"
                                       xmlns="http://www.w3.org/2000/svg"
                                     >
                                       <path
                                         d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
-                                        fill="currentColor"
+                                        fill="#fff"
                                       ></path>
                                       <path
                                         d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
@@ -2148,327 +2375,459 @@ onBeforeUnmount(() => {
                     </TransitionRoot>
                   </div>
                 </TabPanel>
-                <TabPanel :key="2">
-                  <div>
-                    <div class="flex-grow overflow-y-auto">hi hello</div>
-                    <div class="w-full absolute bottom-0 flex mb-12">
-                      <div class="relative w-full bg-gray-50">
+                <TabPanel :key="2" class="flex flex-col h-full overflow-hidden">
+                  <div class="flex-grow flex overflow-y-auto w-full">
+                    <div
+                      v-if="messageData.length > 0"
+                      ref="chatContainer"
+                      class="w-full"
+                    >
+                      <div
+                        v-for="(msgGrp, index) in messageData"
+                        :key="index"
+                        style="
+                          border-bottom: 1px solid rgb(235, 234, 226);
+                          padding: 10px;
+                        "
+                        class="chat-group d-flex align-start"
+                        :class="msgGrp.senderId ? 'bg-white' : 'bg-blue-100'"
+                      >
                         <div
-                          class="overflow-hidden rounded-lg border border-gray-300 shadow-sm focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500"
+                          v-for="(msgData, msgIndex) in msgGrp.messages"
+                          :key="msgIndex"
+                          class="chat-font ml-3"
+                          :class="[
+                            msgGrp?.messages.length - 1 !== msgIndex
+                              ? 'mb-3'
+                              : 'mb-1',
+                          ]"
+                          :style="`font-size: ${settings.fontSize}px`"
                         >
-                          <div v-if="selectedPrompt.key" class="my-2">
-                            <span
-                              class="bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full mx-2 my-6"
-                              >{{ selectedPrompt?.name }}
-                            </span>
-                          </div>
-
-                          <textarea
-                            v-model="questionInput"
-                            :disabled="isLoading"
-                            ref="messageInput"
-                            id="message-input"
-                            rows="2"
-                            name="description"
-                            class="outline-none bg-gray-50 block px-2 w-full resize-none border-0 py-0 text-gray-900 placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6 mb-[-2px]"
-                            :class="isLoading ? 'cursor-wait' : ''"
-                            :placeholder="
-                              !isLoading ? 'Ask a question...' : 'Loading...'
+                          <pre
+                            class="formatted-text my-0"
+                            :style="`font-size: ${settings.fontSize}px; `"
+                            v-html="formattedText(msgData?.message)"
+                          ></pre>
+                          <p
+                            v-if="
+                              isCopiedTriggered === -1 ||
+                              isCopiedTriggered !== index
                             "
-                            @input="adjustHeight"
-                          />
-
-                          <!-- Spacer element to match the height of the toolbar -->
-                          <div aria-hidden="true">
-                            <div class="">
-                              <div class="" />
-                            </div>
-                            <div class="h-px" />
-                            <div class="py-2">
-                              <div class="py-px">
-                                <div class="h-9" />
-                              </div>
-                            </div>
+                            class="text-blue-600 hover:text-blue-800 underline text-xs my-0 cursor-pointer"
+                            style="font-size: 8px"
+                            @click="copyMessage(msgData?.message, index)"
+                          >
+                            Copy
+                          </p>
+                          <p
+                            v-else-if="isCopiedTriggered === index"
+                            class="italic my-0"
+                            :style="`font-size: ${settings.fontSize}px`"
+                          >
+                            Copied
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-else ref="noChatContainer" class="grow">
+                      <div class="flex flex-col mb-4 gap-4 py-4 px-4">
+                        <div class="flex justify-start">
+                          <div
+                            class="bg-blue-500 rounded-lg px-4 py-2 max-w-[80%]"
+                          >
+                            <p class="!text-white text-sm">
+                              How can I help you today?
+                            </p>
                           </div>
                         </div>
-
-                        <div class="absolute inset-x-px bottom-0">
-                          <!-- Actions: These are just examples to demonstrate the concept, replace/wire these up however makes sense for your project. -->
-                          <!-- <div
-                                        class="flex flex-nowrap justify-end space-x-2 px-2 py-2 sm:px-3"
-                                      >
-                                        hi
-                                      </div> -->
+                        <div class="flex justify-start">
                           <div
-                            class="flex items-center justify-between space-x-3 border-t border-gray-200 px-2 py-2 sm:px-3 bg-white"
+                            class="bg-blue-500 rounded-lg px-4 py-2 max-w-[80%]"
                           >
-                            <div class="flex flex-wrap gap-2">
-                              <!-- <button
-                                            type="button"
-                                            class="group -my-2 -ml-2 inline-flex items-center rounded-full px-3 py-2 text-left text-gray-400"
-                                          >
-                                            <PaperClipIcon
-                                              class="-ml-1 mr-2 h-5 w-5 group-hover:text-gray-500"
-                                              aria-hidden="true"
-                                            />
-                                          </button> -->
-                              <Listbox
-                                as="div"
-                                v-model="assigned"
-                                class="flex-shrink-0"
-                              >
-                                <ListboxLabel class="sr-only"
-                                  >Language</ListboxLabel
-                                >
-                                <div class="relative">
-                                  <ListboxButton
-                                    class="relative inline-flex items-center whitespace-nowrap rounded-full bg-blue-100 px-0.5 py-0.5 text-sm font-medium text-gray-500 hover:bg-blue-200 sm:px-3"
-                                  >
-                                    <span
-                                      :class="[
-                                        assigned.value === null
-                                          ? ''
-                                          : 'text-gray-900',
-                                        'hidden truncate sm:block',
-                                      ]"
-                                      >{{
-                                        assigned.value === null
-                                          ? "Assign"
-                                          : assigned.name
-                                      }}</span
-                                    >
-                                  </ListboxButton>
-
-                                  <transition
-                                    leave-active-class="transition ease-in duration-100"
-                                    leave-from-class="opacity-100"
-                                    leave-to-class="opacity-0"
-                                  >
-                                    <ListboxOptions
-                                      class="absolute bottom-full left-0 z-10 mt-1 max-h-56 w-52 overflow-auto rounded-lg bg-white py-3 text-base shadow ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
-                                    >
-                                      <ListboxOption
-                                        as="template"
-                                        v-for="assignee in assignees"
-                                        :key="assignee.value"
-                                        :value="assignee"
-                                        v-slot="{ active }"
-                                      >
-                                        <li
-                                          :class="[
-                                            active ? 'bg-gray-100' : 'bg-white',
-                                            'relative cursor-default select-none px-3 py-2',
-                                          ]"
-                                        >
-                                          <div class="flex items-center">
-                                            <span
-                                              class="ml-3 block truncate font-medium"
-                                              >{{ assignee.name }}</span
-                                            >
-                                          </div>
-                                        </li>
-                                      </ListboxOption>
-                                    </ListboxOptions>
-                                  </transition>
-                                </div>
-                              </Listbox>
-
-                              <Listbox
-                                as="div"
-                                v-model="labelled"
-                                class="flex-shrink-0"
-                              >
-                                <ListboxLabel class="sr-only"
-                                  >Add a label</ListboxLabel
-                                >
-                                <div class="relative">
-                                  <ListboxButton
-                                    class="relative inline-flex items-center whitespace-nowrap rounded-full bg-blue-100 px-0.5 py-0.5 text-sm font-medium text-gray-500 hover:bg-blue-200 sm:px-3"
-                                  >
-                                    <span
-                                      :class="[
-                                        labelled.value === null
-                                          ? ''
-                                          : 'text-gray-900',
-                                        'hidden truncate  sm:block',
-                                      ]"
-                                      >{{
-                                        labelled.value === null
-                                          ? "Label"
-                                          : labelled.name
-                                      }}</span
-                                    >
-                                  </ListboxButton>
-
-                                  <transition
-                                    leave-active-class="transition ease-in duration-100"
-                                    leave-from-class="opacity-100"
-                                    leave-to-class="opacity-0"
-                                  >
-                                    <ListboxOptions
-                                      class="absolute bottom-full right-0 z-10 mt-1 max-h-56 w-52 overflow-auto rounded-lg bg-white py-3 text-base shadow ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
-                                    >
-                                      <ListboxOption
-                                        as="template"
-                                        v-for="label in labels"
-                                        :key="label.value"
-                                        :value="label"
-                                        v-slot="{ active }"
-                                      >
-                                        <li
-                                          :class="[
-                                            active ? 'bg-gray-100' : 'bg-white',
-                                            'relative cursor-default select-none px-3 py-2',
-                                          ]"
-                                        >
-                                          <div class="flex items-center">
-                                            <span
-                                              class="block truncate font-medium"
-                                              >{{ label.name }}</span
-                                            >
-                                          </div>
-                                        </li>
-                                      </ListboxOption>
-                                    </ListboxOptions>
-                                  </transition>
-                                </div>
-                              </Listbox>
-
-                              <Listbox
-                                as="div"
-                                v-model="labelled"
-                                class="flex-shrink-0"
-                              >
-                                <ListboxLabel class="sr-only"
-                                  >Add a label
-                                </ListboxLabel>
-                                <div class="relative">
-                                  <ListboxButton
-                                    class="relative inline-flex items-center whitespace-nowrap rounded-full bg-blue-100 px-0.5 py-0.5 text-sm font-medium text-gray-500 hover:bg-blue-200 sm:px-3"
-                                  >
-                                    <span
-                                      :class="[
-                                        labelled.value === null
-                                          ? ''
-                                          : 'text-gray-900',
-                                        'hidden truncate  sm:block',
-                                      ]"
-                                      >{{
-                                        labelled.value === null
-                                          ? "Label"
-                                          : labelled.name
-                                      }}</span
-                                    >
-                                  </ListboxButton>
-
-                                  <transition
-                                    leave-active-class="transition ease-in duration-100"
-                                    leave-from-class="opacity-100"
-                                    leave-to-class="opacity-0"
-                                  >
-                                    <ListboxOptions
-                                      class="absolute bottom-full right-0 z-10 mt-1 max-h-56 w-52 overflow-auto rounded-lg bg-white py-3 text-base shadow ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
-                                    >
-                                      <ListboxOption
-                                        as="template"
-                                        v-for="label in labels"
-                                        :key="label.value"
-                                        :value="label"
-                                        v-slot="{ active }"
-                                      >
-                                        <li
-                                          :class="[
-                                            active ? 'bg-gray-100' : 'bg-white',
-                                            'relative cursor-default select-none px-3 py-2',
-                                          ]"
-                                        >
-                                          <div class="flex items-center">
-                                            <span
-                                              class="block truncate font-medium"
-                                              >{{ label.name }}</span
-                                            >
-                                          </div>
-                                        </li>
-                                      </ListboxOption>
-                                    </ListboxOptions>
-                                  </transition>
-                                </div>
-                              </Listbox>
-                            </div>
-                            <div class="flex-shrink-0">
-                              <PaperAirplaneIcon
-                                class="h-5 w-5 fill-gray-400"
-                                aria-hidden="true"
-                              />
-                            </div>
+                            <p class="!text-white text-sm">
+                              Select a prompt to get started or select any text
+                              on the screen to get a response.
+                            </p>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <!-- <div
-                      class="flex relative w-full bg-white-100 border-t-1 border-slate-400 flex-shrink-0 mt-auto"
-                      style="
-                        border-top: solid;
-                        border-width: 1px;
-                        border-color: #cfd8dc;
-                      "
-                    >
-                      <textarea
-                        v-model="questionInput"
-                        :disabled="isLoading"
-                        ref="messageInput"
-                        type="search"
-                        id="message-input"
-                        :class="isLoading ? 'cursor-wait' : ''"
-                        class="block w-full m-2 z-20 text-md text-slate-900 font-sans overflow-y-auto"
-                        rows="1"
-                        style="
-                          background: transparent;
-                          border: none;
-                          outline: none;
-                          resize: none;
-                        "
-                        :placeholder="
-                          !isLoading ? 'Ask a question...' : 'Loading...'
-                        "
-                        required
-                        @input="adjustHeight"
-                      />
+                  </div>
 
-                      <button
-                        v-if="!isLoading"
-                        class="flex bg-white cursor-pointer border-none items-center justify-center mx-2 active:scale-95 focus:outline-none"
-                        @click="onSendClick"
+                  <div
+                    ref="messageContainer"
+                    class="w-full mb-12 flex-shrink-0"
+                  >
+                    <div class="relative w-full bg-gray-50">
+                      <div
+                        class="overflow-hidden rounded-lg border border-gray-300 shadow-sm focus-within:border-indigo-100 focus-within:ring-1 focus-within:ring-indigo-100"
                       >
-                        <img
-                          src="/assets/tabler-send.svg"
-                          class="text-slate-700 text-lg w-5 h-5 focus:text-blue-500 hover:text-blue-300"
-                        />
-                      </button>
-                      <button
-                        v-else
-                        type="button"
-                        class="bg-white border-none"
-                        disabled
-                      >
-                        <svg
-                          aria-hidden="true"
-                          class="inline w-5 h-5 mr-2 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
-                          viewBox="0 0 100 101"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
+                        <span
+                          v-if="selectedPrompt.key"
+                          id="badge-dismiss-default"
+                          class="inline-flex items-center px-2 py-1 my-2 mx-1 text-xs font-medium !text-white rounded bg-blue-600"
                         >
-                          <path
-                            d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
-                            fill="currentColor"
-                          />
-                          <path
-                            d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
-                            fill="currentFill"
-                          />
-                        </svg>
-                      </button>
-                    </div> -->
+                          {{ selectedPrompt?.name }}
+                          <button
+                            type="button"
+                            class="inline-flex items-center p-1 ml-2 text-sm text-blue-400 bg-transparent rounded-sm hover:bg-blue-200 hover:text-blue-900 dark:hover:bg-blue-800 dark:hover:text-blue-300"
+                            data-dismiss-target="#badge-dismiss-default"
+                            aria-label="Remove"
+                            @click="onRemoveSelectedPromptClick"
+                          >
+                            <svg
+                              class="w-2 h-2 stroke-white"
+                              aria-hidden="true"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 14 14"
+                            >
+                              <path
+                                stroke="white"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
+                              />
+                            </svg>
+                          </button>
+                        </span>
+
+                        <textarea
+                          v-model="sendMessageRequestData.message"
+                          :disabled="isLoading"
+                          ref="messageInput"
+                          id="message-input"
+                          rows="2"
+                          name="description"
+                          class="outline-none bg-gray-50 block px-2 pt-1 w-full resize-none border-0 py-0 text-gray-900 placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6 mb-[-2px]"
+                          :class="isLoading ? 'cursor-wait' : ''"
+                          :placeholder="
+                            !isLoading ? 'Ask a question...' : 'Loading...'
+                          "
+                          @keydown.enter="onSendClick"
+                          @input="adjustHeight"
+                        />
+
+                        <!-- Spacer element to match the height of the toolbar -->
+                        <div aria-hidden="true">
+                          <div class="">
+                            <div class="" />
+                          </div>
+                          <div class="h-px" />
+                          <div class="py-2">
+                            <div class="py-px">
+                              <div class="h-9" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="absolute inset-x-px bottom-0">
+                        <div
+                          class="flex items-center justify-between space-x-3 border-t border-gray-200 px-2 py-2 sm:px-3 bg-white"
+                        >
+                          <div class="flex flex-wrap gap-2">
+                            <Listbox
+                              as="div"
+                              v-model="sendMessageRequestData.metadata.tag_tone"
+                              class="flex-shrink-0"
+                            >
+                              <ListboxLabel class="sr-only">Tone</ListboxLabel>
+                              <div class="relative">
+                                <ListboxButton
+                                  class="relative inline-flex items-center whitespace-nowrap rounded-full bg-blue-400 px-0.5 py-0.5 text-sm font-medium text-gray-500 hover:bg-blue-500 sm:px-3"
+                                >
+                                  <span
+                                    class="!text-white"
+                                    :class="[
+                                      !sendMessageRequestData.metadata.tag_tone
+                                        ? ''
+                                        : 'text-white',
+                                      'hidden truncate sm:block text-xs',
+                                    ]"
+                                    >{{
+                                      !sendMessageRequestData.metadata.tag_tone
+                                        ? "Tone"
+                                        : sendMessageRequestData.metadata
+                                            .tag_tone
+                                    }}
+                                    <button
+                                      v-if="
+                                        sendMessageRequestData.metadata
+                                          ?.tag_tone
+                                      "
+                                      type="button"
+                                      class="inline-flex items-center p-1 ml-2 text-sm text-blue-400 bg-transparent rounded-sm hover:bg-blue-200 hover:text-blue-900 dark:hover:bg-blue-800 dark:hover:text-blue-300"
+                                      data-dismiss-target="#badge-dismiss-default"
+                                      aria-label="Remove"
+                                      @click.stop="
+                                        sendMessageRequestData.metadata.tag_tone =
+                                          ''
+                                      "
+                                    >
+                                      <svg
+                                        class="w-2 h-2 stroke-black"
+                                        aria-hidden="true"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 14 14"
+                                      >
+                                        <path
+                                          stroke="white"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
+                                        />
+                                      </svg>
+                                    </button>
+                                  </span>
+                                </ListboxButton>
+
+                                <transition
+                                  leave-active-class="transition ease-in duration-100"
+                                  leave-from-class="opacity-100"
+                                  leave-to-class="opacity-0"
+                                >
+                                  <ListboxOptions
+                                    class="absolute bottom-full left-0 z-10 mt-1 max-h-56 w-52 overflow-auto rounded-lg bg-white py-3 text-base shadow ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+                                  >
+                                    <ListboxOption
+                                      as="template"
+                                      v-for="(tone, index) in promptTonesData"
+                                      :key="index"
+                                      :value="tone?.name"
+                                      v-slot="{ active }"
+                                    >
+                                      <li
+                                        :class="[
+                                          active ? 'bg-gray-100' : 'bg-white',
+                                          'relative cursor-default select-none px-3 py-2',
+                                        ]"
+                                      >
+                                        <div class="flex items-center">
+                                          <span
+                                            class="ml-3 block truncate font-medium"
+                                            >{{ tone.name }}</span
+                                          >
+                                        </div>
+                                      </li>
+                                    </ListboxOption>
+                                  </ListboxOptions>
+                                </transition>
+                              </div>
+                            </Listbox>
+
+                            <Listbox
+                              as="div"
+                              v-model="
+                                sendMessageRequestData.metadata
+                                  .tag_writing_style
+                              "
+                              class="flex-shrink-0"
+                            >
+                              <ListboxLabel class="sr-only"
+                                >Writing Style</ListboxLabel
+                              >
+                              <div class="relative">
+                                <ListboxButton
+                                  class="relative inline-flex items-center whitespace-nowrap rounded-full bg-blue-400 px-0.5 py-0.5 text-sm font-medium text-gray-500 hover:bg-blue-500 sm:px-3"
+                                >
+                                  <span
+                                    class="!text-white"
+                                    :class="[
+                                      !sendMessageRequestData.metadata
+                                        .tag_writing_style
+                                        ? ''
+                                        : 'text-white',
+                                      'hidden truncate sm:block text-xs',
+                                    ]"
+                                    >{{
+                                      !sendMessageRequestData.metadata
+                                        .tag_writing_style
+                                        ? "Writing Style"
+                                        : sendMessageRequestData.metadata
+                                            .tag_writing_style
+                                    }}
+                                    <button
+                                      v-if="
+                                        sendMessageRequestData.metadata
+                                          ?.tag_writing_style
+                                      "
+                                      type="button"
+                                      class="inline-flex items-center p-1 ml-2 text-sm text-blue-400 bg-transparent rounded-sm hover:bg-blue-200 hover:text-blue-900 dark:hover:bg-blue-800 dark:hover:text-blue-300"
+                                      data-dismiss-target="#badge-dismiss-default"
+                                      aria-label="Remove"
+                                      @click.stop="
+                                        sendMessageRequestData.metadata.tag_writing_style =
+                                          ''
+                                      "
+                                    >
+                                      <svg
+                                        class="w-2 h-2 stroke-black"
+                                        aria-hidden="true"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 14 14"
+                                      >
+                                        <path
+                                          stroke="white"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
+                                        />
+                                      </svg>
+                                    </button>
+                                  </span>
+                                </ListboxButton>
+
+                                <transition
+                                  leave-active-class="transition ease-in duration-100"
+                                  leave-from-class="opacity-100"
+                                  leave-to-class="opacity-0"
+                                >
+                                  <ListboxOptions
+                                    class="absolute bottom-full right-50 z-10 mt-1 max-h-56 w-52 overflow-auto rounded-lg bg-white py-3 text-base shadow ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+                                  >
+                                    <ListboxOption
+                                      as="template"
+                                      v-for="(
+                                        writingStyle, index
+                                      ) in promptWritingStylesData"
+                                      :key="writingStyle.value"
+                                      :value="writingStyle.name"
+                                      v-slot="{ active }"
+                                    >
+                                      <li
+                                        :class="[
+                                          active ? 'bg-gray-100' : 'bg-white',
+                                          'relative cursor-default select-none px-3 py-2',
+                                        ]"
+                                      >
+                                        <div class="flex items-center">
+                                          <span
+                                            class="block truncate font-medium"
+                                            >{{ writingStyle.name }}</span
+                                          >
+                                        </div>
+                                      </li>
+                                    </ListboxOption>
+                                  </ListboxOptions>
+                                </transition>
+                              </div>
+                            </Listbox>
+
+                            <Listbox
+                              as="div"
+                              v-model="
+                                sendMessageRequestData.metadata.tag_language
+                              "
+                              class="flex-shrink-0"
+                            >
+                              <ListboxLabel class="sr-only"
+                                >Language
+                              </ListboxLabel>
+                              <div class="relative">
+                                <ListboxButton
+                                  class="relative inline-flex items-center whitespace-nowrap rounded-full bg-blue-400 px-0.5 py-0.5 text-sm font-medium text-gray-500 hover:bg-blue-500 sm:px-3"
+                                >
+                                  <span
+                                    class="!text-white"
+                                    :class="[
+                                      !sendMessageRequestData.metadata
+                                        .tag_language
+                                        ? ''
+                                        : 'text-white',
+                                      'hidden truncate sm:block text-xs',
+                                    ]"
+                                    >{{
+                                      !sendMessageRequestData.metadata
+                                        .tag_language
+                                        ? "Language"
+                                        : sendMessageRequestData.metadata
+                                            .tag_language
+                                    }}
+                                    <button
+                                      v-if="
+                                        sendMessageRequestData.metadata
+                                          ?.tag_language
+                                      "
+                                      type="button"
+                                      class="inline-flex items-center p-1 ml-2 text-sm text-blue-400 bg-transparent rounded-sm hover:bg-blue-200 hover:text-blue-900 dark:hover:bg-blue-800 dark:hover:text-blue-300"
+                                      data-dismiss-target="#badge-dismiss-default"
+                                      aria-label="Remove"
+                                      @click.stop="
+                                        sendMessageRequestData.metadata.tag_language =
+                                          ''
+                                      "
+                                    >
+                                      <svg
+                                        class="w-2 h-2 stroke-black"
+                                        aria-hidden="true"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 14 14"
+                                      >
+                                        <path
+                                          stroke="white"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
+                                        />
+                                      </svg>
+                                    </button>
+                                  </span>
+                                </ListboxButton>
+
+                                <transition
+                                  leave-active-class="transition ease-in duration-100"
+                                  leave-from-class="opacity-100"
+                                  leave-to-class="opacity-0"
+                                >
+                                  <ListboxOptions
+                                    class="absolute bottom-full right-50 z-10 mt-1 max-h-56 w-52 overflow-auto rounded-lg bg-white py-3 text-base shadow ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+                                  >
+                                    <ListboxOption
+                                      as="template"
+                                      v-for="(
+                                        language, index
+                                      ) in promptLanguagesData"
+                                      :key="index"
+                                      :value="language.name"
+                                      v-slot="{ active }"
+                                    >
+                                      <li
+                                        :class="[
+                                          active ? 'bg-gray-100' : 'bg-white',
+                                          'relative cursor-default select-none px-3 py-2',
+                                        ]"
+                                      >
+                                        <div class="flex items-center">
+                                          <span
+                                            class="block truncate font-medium"
+                                            >{{ language.name }}</span
+                                          >
+                                        </div>
+                                      </li>
+                                    </ListboxOption>
+                                  </ListboxOptions>
+                                </transition>
+                              </div>
+                            </Listbox>
+                          </div>
+                          <div class="flex-shrink-0">
+                            <PaperAirplaneIcon
+                              class="h-5 w-5 fill-gray-400"
+                              aria-hidden="true"
+                              @click="onSendClick"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </TabPanel>
               </TabPanels>
@@ -2489,58 +2848,13 @@ onBeforeUnmount(() => {
                         ? 'bg-cyan-600 shadow'
                         : 'text-gray-700 hover:bg-white/[0.12] hover:text-gray-300',
                     ]"
+                    @click="selectedTab = index"
                   >
                     {{ tab.name }}
                   </button>
                 </Tab>
               </TabList>
             </TabGroup>
-          </div>
-          <div
-            v-if="messageData.length > 0"
-            ref="chatContainer"
-            class="flex-grow overflow-y-auto rounded-lg"
-          >
-            <div
-              v-for="(msgGrp, index) in messageData"
-              :key="index"
-              style="border-bottom: 1px solid rgb(235, 234, 226); padding: 10px"
-              class="chat-group d-flex align-start"
-              :class="
-                msgGrp.senderId ? 'sender-msg-container' : 'bot-msg-container'
-              "
-            >
-              <div
-                v-for="(msgData, msgIndex) in msgGrp.messages"
-                :key="msgIndex"
-                class="chat-font ml-3"
-                :class="[
-                  msgGrp?.messages.length - 1 !== msgIndex ? 'mb-3' : 'mb-1',
-                ]"
-                :style="`font-size: ${settings.fontSize}px`"
-              >
-                <pre
-                  class="formatted-text my-0"
-                  :style="`font-size: ${settings.fontSize}px; `"
-                  v-html="formattedText(msgData?.message)"
-                ></pre>
-                <p
-                  v-if="isCopiedTriggered === -1 || isCopiedTriggered !== index"
-                  class="text-blue-600 hover:text-blue-800 underline text-xs my-0 cursor-pointer"
-                  style="font-size: 8px"
-                  @click="copyMessage(msgData?.message, index)"
-                >
-                  Copy
-                </p>
-                <p
-                  v-else-if="isCopiedTriggered === index"
-                  class="italic my-0"
-                  :style="`font-size: ${settings.fontSize}px`"
-                >
-                  Copied
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </TransitionChild>
@@ -2550,7 +2864,7 @@ onBeforeUnmount(() => {
       class="fixed flex right-0 bottom-0 m-3 z-[999999] items-end font-sans leading-1em"
     >
       <button
-        class="flex rounded-full cursor-pointer border-none bg-white focus:bg-gray-50"
+        class="flex rounded-full cursor-pointer border-none bg-white hover:bg-blue-400 focus:bg-gray-50"
         id="respond-buddy-fba-button"
         ref="fbaButton"
         @mousedown.prevent="dragStart"
@@ -2561,7 +2875,7 @@ onBeforeUnmount(() => {
           class="text-lg"
           alt="Respond Buddy"
           style="
-            width: 50px;
+            width: 35px;
             padding-top: 3px;
             border-radius: 100%;
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.15);
@@ -2630,7 +2944,7 @@ onBeforeUnmount(() => {
 }
 
 .bot-msg-container {
-  background-color: rgb(250, 249, 246);
+  /* background-color: rgb(250, 249, 246); */
 }
 
 .formatted-text {
@@ -2667,7 +2981,7 @@ onBeforeUnmount(() => {
 
 .sidebar {
   background-color: white;
-  width: 500px;
+  width: 450px;
   height: 99%;
   overflow-y: auto;
   border-radius: 12px;
@@ -2718,7 +3032,7 @@ onBeforeUnmount(() => {
 }
 
 .prompt-card {
-  @apply relative p-2;
+  @apply relative p-1;
 
   /* The actual gradient border */
   &::before {

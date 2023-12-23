@@ -5,7 +5,7 @@
   >
     <div class="pt-5 px-3 rounded-lg flex flex-col w-full text-white">
       <div class="font-bold text-xl my-10">Welcome to Respond Buddy! 👋</div>
-      <div class="text-md">
+      <div class="text-base">
         Ready to try it? 🤔 Highlight on any text in your browser 🖱️, choose
         from options like 'Summarize,' 'Simplify,' or 'Expand.'
         <br />
@@ -20,8 +20,9 @@
           type="text"
           class="bg-purple-white shadow rounded-xl border-0 p-3 w-full bg-white"
           placeholder="Ask me anything"
+          @click="$emit('onAskMeAnythingClick')"
         />
-        <div class="absolute top-0 right-0 p-4 pr-3 text-purple-lighter">
+        <div class="absolute top-0 right-0 p-4 pt-2.5 text-purple-lighter">
           <PaperAirplaneIcon class="h-5 w-5 fill-gray-400" aria-hidden="true" />
         </div>
       </div>
@@ -88,6 +89,7 @@
             type="button"
             class="text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none font-medium rounded-lg text-md px-5 py-2 text-center mr-2 mb-2 border-none"
             style="color: white"
+            @click="$emit('onPromptClick', prompt)"
           >
             {{ prompt.name }}
           </button>
@@ -102,7 +104,10 @@ import facebookSvg from "../../assets/facebook-svgrepo.svg";
 import twitterSvg from "../../assets/twitter-svgrepo.svg";
 import linkedinSvg from "../../assets/linkedin-svgrepo.svg";
 import whatsappSvg from "../../assets/whatsapp-svgrepo.svg";
-import { defineProps, ref, withDefaults } from "vue";
+import { PaperAirplaneIcon } from "@heroicons/vue/24/solid";
+import { defineProps, ref, withDefaults, defineEmits } from "vue";
+
+defineEmits(["onAskMeAnythingClick", "onPromptClick"]);
 
 interface Props {
   token: string;

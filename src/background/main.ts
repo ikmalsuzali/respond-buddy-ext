@@ -1,3 +1,4 @@
+import { send } from "vite";
 import { onMessage, sendMessage } from "webext-bridge/background";
 import type { Tabs } from "webextension-polyfill";
 import { generateUUID } from "~/logic/helper";
@@ -9,6 +10,10 @@ import {
   fontSize,
   chatButtonPosition,
   templates,
+  templateLanguages,
+  templateTones,
+  templateWritingStyles,
+  templateCategories,
 } from "~/logic/storage";
 
 // let webUrl = "https://api.respondbuddy.com";
@@ -97,6 +102,21 @@ browser.tabs.onActivated.addListener(async ({ tabId }) => {
     previousTabId = tabId;
   } catch {
     return;
+  }
+});
+
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  console.log(changeInfo);
+  previousTabId = tabId;
+  if (changeInfo.url) {
+    sendMessage(
+      "url-changed",
+      { url: changeInfo.url },
+      {
+        context: "content-script",
+        tabId: tabId,
+      }
+    );
   }
 });
 
@@ -238,6 +258,102 @@ const fetchTagCategories = async (name: string = "") => {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+    });
+
+    let response = await data.json();
+    console.log(
+      "🚀 ~ file: main.ts:216 ~ fetchTagCategories ~ response:",
+      response
+    );
+
+    return response?.data || [];
+  } catch (error) {
+    console.log("🚀 ~ file: main.ts:223 ~ fetchTagCategories ~ error:", error);
+
+    return [];
+  }
+};
+
+const fetchTagWritingStyles = async (name: string = "") => {
+  try {
+    const baseURL = `${webUrl}/api/v1/tag/writing-styles`;
+    const url = new URL(baseURL);
+
+    if (name) {
+      url.searchParams.append("name", name);
+    }
+
+    // Add the query parameters to the URL
+    const data = await fetch(`${url}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    let response = await data.json();
+    console.log(
+      "🚀 ~ file: main.ts:216 ~ fetchTagCategories ~ response:",
+      response
+    );
+
+    return response?.data || [];
+  } catch (error) {
+    console.log("🚀 ~ file: main.ts:223 ~ fetchTagCategories ~ error:", error);
+
+    return [];
+  }
+};
+
+const fetchTagTones = async (name: string = "") => {
+  try {
+    const baseURL = `${webUrl}/api/v1/tag/tones`;
+    const url = new URL(baseURL);
+
+    if (name) {
+      url.searchParams.append("name", name);
+    }
+
+    // Add the query parameters to the URL
+    const data = await fetch(`${url}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+    });
+
+    let response = await data.json();
+    console.log(
+      "🚀 ~ file: main.ts:216 ~ fetchTagCategories ~ response:",
+      response
+    );
+
+    return response?.data || [];
+  } catch (error) {
+    console.log("🚀 ~ file: main.ts:223 ~ fetchTagCategories ~ error:", error);
+
+    return [];
+  }
+};
+
+const fetchTagLanguages = async (name: string = "") => {
+  try {
+    const baseURL = `${webUrl}/api/v1/tag/languages`;
+    const url = new URL(baseURL);
+
+    if (name) {
+      url.searchParams.append("name", name);
+    }
+
+    // Add the query parameters to the URL
+    const data = await fetch(`${url}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
       },
     });
 
@@ -257,14 +373,13 @@ const fetchTagCategories = async (name: string = "") => {
 
 const fetchTags = async ({
   page = 1,
-  limit = 50,
+  limit = 20,
   search = "",
   sortBy = "relevance",
   category,
   filterType = "all",
   userId,
   workspaceId,
-  token, // assuming an authentication token is needed
 }: {
   page?: number;
   limit?: number;
@@ -296,11 +411,12 @@ const fetchTags = async ({
   try {
     const headers = {
       "Content-Type": "application/json",
+      authorization: `Bearer ${token.value}`,
     };
 
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+    // if (token) {
+    //   headers["Authorization"] = `Bearer ${token}`;
+    // }
 
     const response = await fetch(url, {
       method: "GET",
@@ -315,6 +431,34 @@ const fetchTags = async ({
     return data;
   } catch (error) {
     console.error("Failed to fetch tags:", error);
+    return null;
+  }
+};
+
+const updateLikedPrompt = async (promptId: string, liked: boolean) => {
+  try {
+    const baseURL = `${webUrl}/api/v1/tags/${promptId}/like-toggle`;
+    const url = new URL(baseURL);
+
+    const response = await fetch(`${url}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+      body: JSON.stringify({
+        is_liked: liked,
+      }),
+    });
+
+    if (!response) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Failed to update liked prompt:", error);
     return null;
   }
 };
@@ -374,6 +518,7 @@ const templatesInit = async () => {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
       },
     });
 
@@ -726,15 +871,69 @@ onMessage("get-templates-api", async (message: any) => {
   return data;
 });
 
-onMessage("get-template-categories-api", async (message: any) => {
+onMessage("fetch-template-categories-api", async (message: any) => {
+  // if (templateCategories.value.length > 0) return templateCategories.value;
   const data = await fetchTagCategories(message?.data || "");
-  console.log("🚀 ~ file: main.ts:697 ~ onMessage ~ data:", data);
+  templateCategories.value = data || [];
+  return data;
+});
+
+onMessage("fetch-template-writing-styles", async (message: any) => {
+  // if (templateWritingStyles.value.length > 0)
+  //   return templateWritingStyles.value;
+  const data = await fetchTagWritingStyles(message?.data || "");
+  templateWritingStyles.value = data || [];
+  return data;
+});
+
+onMessage("fetch-template-languages", async (message: any) => {
+  // if (templateLanguages.value.length > 0) return templateLanguages.value;
+  const data = await fetchTagLanguages(message?.data || "");
+  templateLanguages.value = data || [];
+  return data;
+});
+
+onMessage("fetch-template-tones", async (message: any) => {
+  // if (templateTones.value.length > 0) return templateTones.value;
+  const data = await fetchTagTones(message?.data || "");
+  templateTones.value = data || [];
   return data;
 });
 
 onMessage("create-prompt", async (message: any) => {
-  console.log("🚀 ~ file: main.ts:697 ~ onMessage ~ message", message);
   const data = await createPromptTemplate(message?.data || {});
-  console.log("🚀 ~ file: main.ts:736 ~ onMessage ~ data:", data);
   return data;
+});
+
+onMessage("set-liked-prompt", (message: any) => {
+  updateLikedPrompt(message?.data?.id, message?.data?.isLiked);
+});
+
+const selectedPrompt = ref();
+onMessage("set-selected-prompt", (message: any) => {
+  selectedPrompt.value = {
+    key: message?.data?.key,
+    name: message?.data?.name,
+  };
+  console.log("🚀 ~ file: main.ts:913 ~ onMessage ~ message:", message);
+
+  browser.tabs
+    .query({ active: true, currentWindow: true })
+    .then(async (tabs) => {
+      const currentTab = tabs[0];
+
+      // Get a value from local storage
+      let res = await sendMessage(
+        "set-selected-prompt",
+        { selectedPrompt: selectedPrompt.value },
+        { context: "content-script", tabId: currentTab.id }
+      );
+      console.log("🚀 ~ file: main.ts:928 ~ .then ~ res:", res);
+    });
+
+  // sendMessage(
+  //   "selected-prompt",
+  //   { selectedPrompt: selectedPrompt.value },
+  //   { context: "content-script", tabId: previousTabId }
+  // );
 });

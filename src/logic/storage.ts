@@ -7,6 +7,14 @@ export const credits = useStorageLocal("credits", 10);
 export const newCreditDate = useStorageLocal("new_credit_date", 0);
 export const fontSize = useStorageLocal("font_size", 18);
 export const templates = useStorageLocal("templates", []);
+export const templateLanguages = useStorageLocal("template-languages", []);
+export const templateCategories = useStorageLocal("template-categories", []);
+export const templateTones = useStorageLocal("template-tones", []);
+export const templateWritingStyles = useStorageLocal(
+  "template-writing-styles",
+  []
+);
+export const prompts = useStorageLocal("prompts", []);
 export const chatButtonPosition = useStorageLocal("chat_button_position", {
   right: 0,
   bottom: 40,
