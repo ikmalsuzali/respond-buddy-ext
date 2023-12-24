@@ -12,7 +12,7 @@
           <XMarkIcon
             class="-mr-1 h-5 w-5 text-gray-400 ml-auto"
             aria-hidden="true"
-            @click.stop="() => (selectedPrompt = { key: null, name: null })"
+            @click.stop="clearSelectedPrompt"
           />
         </div>
       </div>
@@ -36,7 +36,7 @@
                     v-else
                     class="-mr-1 h-5 w-5 text-gray-400"
                     aria-hidden="true"
-                    @click.stop="() => (currentToneMenuItem = {})"
+                    @click.stop="setCurrentToneMenuItem({ key: '', name: '' })"
                   />
                 </MenuButton>
               </div>
@@ -61,7 +61,7 @@
                             : 'text-gray-700',
                           'block px-4 py-2 text-sm',
                         ]"
-                        @click="() => (currentToneMenuItem = item)"
+                        @click="setCurrentToneMenuItem(item)"
                         >{{ item.name }}</a
                       >
                     </MenuItem>
@@ -84,7 +84,9 @@
                     v-else
                     class="-mr-1 h-5 w-5 text-gray-400"
                     aria-hidden="true"
-                    @click.stop="() => (currentWritingStyleMenuItem = {})"
+                    @click.stop="
+                      setCurrentWritingStyleMenuItem({ key: '', name: '' })
+                    "
                   />
                 </MenuButton>
               </div>
@@ -113,7 +115,7 @@
                             : 'text-gray-700',
                           'block px-4 py-2 text-sm',
                         ]"
-                        @click="() => (currentWritingStyleMenuItem = item)"
+                        @click="setCurrentWritingStyleMenuItem(item)"
                         >{{ item.name }}</a
                       >
                     </MenuItem>
@@ -136,7 +138,9 @@
                     v-else
                     class="-mr-1 h-5 w-5 text-gray-400"
                     aria-hidden="true"
-                    @click.stop="() => (currentLanguageMenuItem = {})"
+                    @click.stop="
+                      setCurrentLanguageMenuItem({ key: '', name: '' })
+                    "
                   />
                 </MenuButton>
               </div>
@@ -165,7 +169,7 @@
                             : 'text-gray-700',
                           'block px-4 py-2 text-sm',
                         ]"
-                        @click="() => (currentLanguageMenuItem = item)"
+                        @click="setCurrentLanguageMenuItem(item)"
                         >{{ item.name }}</a
                       >
                     </MenuItem>
@@ -219,6 +223,30 @@ const fetchTemplateWritingStyles = async (name: string = "") => {
   const data = await sendMessage("fetch-template-writing-styles", name);
   console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
   writingStyleMenuItems.value = data || [];
+};
+
+const setCurrentToneMenuItem = async (item: any) => {
+  currentToneMenuItem.value = item;
+  await sendMessage("set-template-tone", item);
+};
+
+const setCurrentWritingStyleMenuItem = async (item: any) => {
+  currentWritingStyleMenuItem.value = item;
+  await sendMessage("set-template-writing-style", item);
+};
+
+const setCurrentLanguageMenuItem = async (item: any) => {
+  currentLanguageMenuItem.value = item;
+  await sendMessage("set-template-language", item);
+};
+
+const clearSelectedPrompt = async () => {
+  selectedPrompt.value = {
+    key: null,
+    name: null,
+  };
+
+  await sendMessage("set-selected-prompt", { key: null, name: null });
 };
 
 onMessage("set-selected-prompt", (data) => {

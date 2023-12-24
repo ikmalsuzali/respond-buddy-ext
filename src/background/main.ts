@@ -14,6 +14,9 @@ import {
   templateTones,
   templateWritingStyles,
   templateCategories,
+  selectedTemplateLanguage as selectedTemplateLanguageStorage,
+  selectedTemplateTone as selectedTemplateToneStorage,
+  selectedTemplateWritingStyle as selectedTemplateWritingStyleStorage,
 } from "~/logic/storage";
 
 // let webUrl = "https://api.respondbuddy.com";
@@ -910,19 +913,26 @@ onMessage("set-liked-prompt", (message: any) => {
 });
 
 const selectedPrompt = ref();
+const previousSelectedPrompt = ref();
 onMessage("set-selected-prompt", (message: any) => {
   selectedPrompt.value = {
     key: message?.data?.key,
     name: message?.data?.name,
+    aiTemplate: message?.data?.aiTemplate,
   };
-  console.log("🚀 ~ file: main.ts:913 ~ onMessage ~ message:", message);
+
+  if (
+    selectedPrompt.value.key &&
+    previousSelectedPrompt.value?.key !== selectedPrompt.value.key
+  ) {
+    previousSelectedPrompt.value = selectedPrompt.value;
+  }
 
   browser.tabs
     .query({ active: true, currentWindow: true })
     .then(async (tabs) => {
       const currentTab = tabs[0];
 
-      // Get a value from local storage
       let res = await sendMessage(
         "set-selected-prompt",
         { selectedPrompt: selectedPrompt.value },
@@ -930,10 +940,75 @@ onMessage("set-selected-prompt", (message: any) => {
       );
       console.log("🚀 ~ file: main.ts:928 ~ .then ~ res:", res);
     });
+});
 
-  // sendMessage(
-  //   "selected-prompt",
-  //   { selectedPrompt: selectedPrompt.value },
-  //   { context: "content-script", tabId: previousTabId }
-  // );
+const selectedTemplateTone = ref(selectedTemplateToneStorage.value);
+onMessage("get-template-tone", () => {
+  return selectedTemplateTone.value || null;
+});
+
+onMessage("set-template-tone", (message: any) => {
+  console.log("🚀 ~ file: main.ts:943 ~ onMessage ~ message:", message);
+  selectedTemplateTone.value = message?.data;
+  selectedTemplateToneStorage.value = message?.data;
+
+  browser.tabs
+    .query({ active: true, currentWindow: true })
+    .then(async (tabs) => {
+      const currentTab = tabs[0];
+
+      await sendMessage(
+        "set-template-tone",
+        { selectedTemplateTone: selectedTemplateTone.value },
+        { context: "content-script", tabId: currentTab.id! }
+      );
+    });
+});
+
+const selectedTemplateLanguage = ref(selectedTemplateLanguageStorage.value);
+onMessage("get-template-language", () => {
+  return selectedTemplateLanguage.value || null;
+});
+
+onMessage("set-template-language", (message: any) => {
+  console.log("🚀 ~ file: main.ts:948 ~ onMessage ~ message:", message);
+  selectedTemplateLanguage.value = message?.data;
+  selectedTemplateLanguageStorage.value = message?.data;
+
+  browser.tabs
+    .query({ active: true, currentWindow: true })
+    .then(async (tabs) => {
+      const currentTab = tabs[0];
+
+      await sendMessage(
+        "set-template-language",
+        { selectedTemplateLanguage: selectedTemplateLanguage.value },
+        { context: "content-script", tabId: currentTab.id! }
+      );
+    });
+});
+
+const selectedTemplateWritingStyle = ref(
+  selectedTemplateWritingStyleStorage.value
+);
+onMessage("get-template-writing-style", () => {
+  return selectedTemplateWritingStyleStorage.value || null;
+});
+
+onMessage("set-template-writing-style", (message: any) => {
+  console.log("🚀 ~ file: main.ts:953 ~ onMessage ~ message:", message);
+  selectedTemplateWritingStyle.value = message?.data;
+  selectedTemplateWritingStyleStorage.value = message?.data;
+
+  browser.tabs
+    .query({ active: true, currentWindow: true })
+    .then(async (tabs) => {
+      const currentTab = tabs[0];
+
+      await sendMessage(
+        "set-template-writing-style",
+        { selectedTemplateWritingStyle: selectedTemplateWritingStyle.value },
+        { context: "content-script", tabId: currentTab.id! }
+      );
+    });
 });

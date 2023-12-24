@@ -62,12 +62,11 @@ import ButtonGroup from "./ButtonGroup.vue";
 
 const { url: currentUrl } = useUrlWatcher();
 const {
-  embedImages,
   embedWeb,
-  documentImages,
   documentWeb,
   embedChatGPT,
-  listenAndAppendRequestPayload,
+  listenEnterKeyPress,
+  listenSendButtonClick,
 } = useHtmlEmbeddings();
 
 let prevUrl = ref("");
@@ -80,39 +79,127 @@ watchEffect(() => {
       setTimeout(() => {
         embedWeb(currentUrl.value);
         embedChatGPT();
-        listenAndAppendRequestPayload("chat.openai.com/backend-api", "");
       }, 1000);
     });
     prevUrl.value = currentUrl.value;
   }
 });
 
-document.addEventListener("click", function (event) {
-  console.log("🚀 ~ file: App.vue:91 ~ event:", event);
-  const sendButton = document.querySelector('[data-testid="send-button"]');
+listenEnterKeyPress();
+listenSendButtonClick();
 
-  if (sendButton?.contains(event.target)) {
-    const textArea = document.querySelector("#prompt-textarea");
+// document.addEventListener("mousedown", async (event) => {
+//   console.log("🚀 ~ file: App.vue:91 ~ event:", event);
+//   const sendButton = document.querySelector('[data-testid="send-button"]');
+//   if (!sendButton?.contains(event.target)) return;
 
-    if (textArea) {
-      console.log(
-        "🚀 ~ file: App.vue:101 ~ sendButton.addEventListener ~ textArea:",
-        textArea
-      );
-      textArea.value = "hi how are you";
-      textArea.dispatchEvent(new Event("input", { bubbles: true }));
-    }
+//   await triggerSendButton(event);
+// });
 
-    console.log("send button clicked");
-    return;
-  }
-});
+// document.addEventListener("keydown", async (event) => {
+//   console.log("🚀 ~ file: App.vue:91 ~ event:", event);
+//   if (event.key === "Enter") {
+//     await triggerSendButton(event);
+//   }
+// });
 
-const nativeFetch = window.fetch;
-window.fetch = async (...args) => {
-  console.log("detected fetch call");
-  return nativeFetch.apply(window, args);
-};
+// const triggerSendButton = async (event) => {
+//   console.log("🚀 ~ file: App.vue:91 ~ event:", event);
+
+//   const textArea = document.querySelector("#prompt-textarea");
+//   console.log(textArea.value);
+
+//   if (textArea) {
+//     console.log(
+//       "🚀 ~ file: App.vue:101 ~ sendButton.addEventListener ~ textArea:",
+//       textArea
+//     );
+
+//     const templateTone = await sendMessage(
+//       "get-template-tone",
+//       null,
+//       "background"
+//     );
+
+//     console.log(
+//       "🚀 ~ file: App.vue:104 ~ document.addEventListener ~ templateTone:",
+//       templateTone
+//     );
+
+//     const templateLanguage = await sendMessage(
+//       "get-template-language",
+//       null,
+//       "background"
+//     );
+
+//     console.log(
+//       "🚀 ~ file: App.vue:112 ~ document.addEventListener ~ templateLanguage:",
+//       templateLanguage
+//     );
+
+//     const templateWritingStyle = await sendMessage(
+//       "get-template-writing-style",
+//       null,
+//       "background"
+//     );
+
+//     console.log(
+//       "🚀 ~ file: App.vue:120 ~ document.addEventListener ~ templateWritingStyle:",
+//       templateWritingStyle
+//     );
+
+//     textArea.value = generatePrompt(
+//       "Using this topic [input], create a twitter post that will get a lot of engagement.",
+//       textArea.value,
+//       templateTone.name,
+//       templateWritingStyle.name,
+//       templateLanguage.name
+//     );
+//     textArea.dispatchEvent(new Event("input", { bubbles: true }));
+//   }
+
+//   console.log("send button clicked");
+//   return;
+// };
+
+// const generatePrompt = (
+//   promptTemplate: string,
+//   promptValue: string,
+//   tone: string,
+//   writingStyle: string,
+//   language: string = "English"
+// ) => {
+//   if (!promptTemplate && promptValue) return promptValue;
+//   let prompt = "";
+//   prompt += `${
+//     promptTemplate.includes("[input]")
+//       ? replaceInputWithValue(promptTemplate, promptValue)
+//       : promptTemplate
+//   }\n`;
+//   prompt += `Below is the parameters to build this response prompt:\n`;
+//   prompt += `Please include, "Created by Respond Buddy - https://respondbuddy.com"`;
+//   prompt += `\n Please write in ${tone ? `${tone} tone,` : ""} ${
+//     writingStyle ? `${writingStyle} writing style` : ""
+//   } written in ${language}.\n\n`;
+
+//   return prompt;
+// };
+
+// const replaceInputWithValue = (
+//   inputString: string | null,
+//   replacementValue: string
+// ) => {
+//   if (!inputString) return "";
+//   const pattern = /\[input\]/g;
+//   const replacedString = inputString.replace(pattern, replacementValue);
+//   return replacedString || "";
+// };
+
+// const nativeFetch = window.fetch;
+// window.fetch = async (...args) => {
+//   console.log("detected fetch call");
+//   return nativeFetch.apply(window, args);
+// };
 
 const promptRoute = ref("listing");
 

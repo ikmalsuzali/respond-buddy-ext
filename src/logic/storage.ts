@@ -19,6 +19,18 @@ export const chatButtonPosition = useStorageLocal("chat_button_position", {
   right: 0,
   bottom: 40,
 });
+export const selectedTemplateTone = useStorageLocal(
+  "selected-template-tone",
+  {}
+);
+export const selectedTemplateLanguage = useStorageLocal(
+  "selected-template-language",
+  {}
+);
+export const selectedTemplateWritingStyle = useStorageLocal(
+  "selected-template-writing-style",
+  {}
+);
 
 // model tags {
 //   id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

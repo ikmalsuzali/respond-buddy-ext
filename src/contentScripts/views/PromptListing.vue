@@ -328,6 +328,7 @@ const promptsResponseData = ref({
 const selectedPrompt = ref({
   key: "",
   name: "",
+  aiTemplate: "",
 });
 
 watch(debouncedPromptQuery, async () => {
@@ -387,6 +388,7 @@ const onPromptClick = (prompt: any) => {
   selectedPrompt.value = {
     key: prompt.key,
     name: prompt.name,
+    aiTemplate: prompt.ai_template,
   };
 
   console.log(
@@ -395,8 +397,7 @@ const onPromptClick = (prompt: any) => {
   );
 
   sendMessage("set-selected-prompt", {
-    key: prompt.key,
-    name: prompt.name,
+    ...selectedPrompt.value,
   });
 };
 

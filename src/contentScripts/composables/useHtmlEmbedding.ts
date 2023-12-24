@@ -295,55 +295,173 @@ const useHtmlEmbedding = () => {
 
   onMessage("fetch-html-embedding-configs", (message) => {});
 
-  const listenAndAppendRequestPayload = (
-    urlPattern: string,
-    contentToAppend: string
-  ) => {
-    console.log(
-      "🚀 ~ file: useHtmlEmbedding.ts:292 ~ useHtmlEmbedding ~ urlPattern:",
-      urlPattern
-    );
-    window.addEventListener("fetch", async (event) => {
-      console.log(
-        "🚀 ~ file: useHtmlEmbedding.ts:297 ~ window.addEventListener ~ event:",
-        event
-      );
-      const request = event.request;
-      console.log(
-        "🚀 ~ file: index.ts:12 ~ window.addEventListener ~ request:",
-        request
-      );
+  // const listenAndAppendRequestPayload = (
+  //   urlPattern: string,
+  //   contentToAppend: string
+  // ) => {
+  //   console.log(
+  //     "🚀 ~ file: useHtmlEmbedding.ts:292 ~ useHtmlEmbedding ~ urlPattern:",
+  //     urlPattern
+  //   );
+  //   window.addEventListener("fetch", async (event) => {
+  //     console.log(
+  //       "🚀 ~ file: useHtmlEmbedding.ts:297 ~ window.addEventListener ~ event:",
+  //       event
+  //     );
+  //     const request = event.request;
+  //     console.log(
+  //       "🚀 ~ file: index.ts:12 ~ window.addEventListener ~ request:",
+  //       request
+  //     );
 
-      // Check if the request URL matches the specified pattern
-      if (request.url.includes(urlPattern)) {
-        console.log(
-          "🚀 ~ file: index.ts:53 ~ window.addEventListener ~ request:",
-          request
-        );
-        try {
-          // Fetch the data
-          const response = await fetch(request);
+  //     // Check if the request URL matches the specified pattern
+  //     if (request.url.includes(urlPattern)) {
+  //       console.log(
+  //         "🚀 ~ file: index.ts:53 ~ window.addEventListener ~ request:",
+  //         request
+  //       );
+  //       try {
+  //         // Fetch the data
+  //         const response = await fetch(request);
 
-          // Modify the content to append
-          const modifiedContent = contentToAppend;
-          console.log(
-            "🚀 ~ file: index.ts:60 ~ window.addEventListener ~ contentToAppend:",
-            contentToAppend
-          );
+  //         // Modify the content to append
+  //         const modifiedContent = contentToAppend;
+  //         console.log(
+  //           "🚀 ~ file: index.ts:60 ~ window.addEventListener ~ contentToAppend:",
+  //           contentToAppend
+  //         );
 
-          // Append the modified content to the response
-          const updatedResponse = new Response(
-            new Blob([await response.text(), modifiedContent])
-          );
+  //         // Append the modified content to the response
+  //         const updatedResponse = new Response(
+  //           new Blob([await response.text(), modifiedContent])
+  //         );
 
-          // Return the updated response
-          event.respondWith(updatedResponse);
-        } catch (error) {
-          console.error("Fetch failed:", error);
-        }
-      }
+  //         // Return the updated response
+  //         event.respondWith(updatedResponse);
+  //       } catch (error) {
+  //         console.error("Fetch failed:", error);
+  //       }
+  //     }
+  //   });
+  // };
+
+  const listenSendButtonClick = () => {
+    document.addEventListener("mousedown", (event) => {
+      const sendButton = document.querySelector('[data-testid="send-button"]');
+      if (!sendButton?.contains(event.target)) return;
+      updateTextToPrompt();
     });
   };
+
+  const listenEnterKeyPress = () => {
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+
+      event.preventDefault();
+      updateTextToPrompt();
+    });
+  };
+
+  const updateTextToPrompt = () => {
+    const textArea = document.querySelector("#prompt-textarea");
+    console.log(textArea.value);
+
+    if (textArea) {
+      textArea.value = generatePrompt(
+        "Using this topic [input], create a twitter post that will get a lot of engagement.",
+        textArea.value
+      );
+      textArea.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    console.log("send button clicked");
+    return;
+  };
+
+  const generatePrompt = (promptTemplate: string, promptValue: string) => {
+    if (!promptTemplate && promptValue) return promptValue;
+    let prompt = "";
+    prompt += `${
+      promptTemplate.includes("[input]")
+        ? replaceInputWithValue(promptTemplate, promptValue)
+        : promptTemplate
+    }\n`;
+    prompt += `Below is the parameters to build this response prompt:\n`;
+    prompt += `Please include, "Created by Respond Buddy - https://respondbuddy.com"`;
+    prompt += `\n Please write in ${
+      selectedTemplateTone.value.name
+        ? `${selectedTemplateTone.value.name} tone,`
+        : ""
+    } ${
+      selectedTemplateWritingStyle.value.name
+        ? `${selectedTemplateWritingStyle.value.name} writing style`
+        : ""
+    } written in ${selectedTemplateLanguage.value.name}.\n\n`;
+
+    return prompt;
+  };
+
+  const replaceInputWithValue = (
+    inputString: string | null,
+    replacementValue: string
+  ) => {
+    if (!inputString) return "";
+    const pattern = /\[input\]/g;
+    const replacedString = inputString.replace(pattern, replacementValue);
+    return replacedString || "";
+  };
+
+  const selectedTemplateWritingStyle = ref({
+    name: "",
+    key: "",
+  });
+
+  const selectedTemplateLanguage = ref({
+    name: "",
+    key: "",
+  });
+
+  const selectedTemplateTone = ref({
+    name: "",
+    key: "",
+  });
+
+  onMessage("set-template-tone", (data) => {
+    console.log(
+      "🚀 ~ file: PromptListing.vue:447 ~ selectedTemplateTone ~ data:",
+      data.data.selectedTemplateTone
+    );
+    selectedTemplateTone.value = data.data.selectedTemplateTone;
+    console.log(
+      "🚀 ~ file: App.vue:106 ~ onMessage ~ selectedTemplateTone:",
+      selectedTemplateTone.value?.name
+    );
+  });
+
+  onMessage("set-template-writing-style", (data) => {
+    console.log(
+      "🚀 ~ file: PromptListing.vue:447 ~ selectedTemplateWritingStyle ~ data:",
+      data.data
+    );
+    selectedTemplateWritingStyle.value =
+      data.data?.selectedTemplateWritingStyle;
+    console.log(
+      "🚀 ~ file: App.vue:112 ~ onMessage ~ selectedTemplateWritingStyle:",
+      selectedTemplateWritingStyle.value?.name
+    );
+  });
+
+  onMessage("set-template-language", (data) => {
+    console.log(
+      "🚀 ~ file: PromptListing.vue:447 ~ selectedTemplateLanguage3 ~ data:",
+      data
+    );
+    selectedTemplateLanguage.value = data.data?.selectedTemplateLanguage;
+    console.log(
+      "🚀 ~ file: App.vue:118 ~ onMessage ~ selectedTemplateLanguage:",
+      selectedTemplateLanguage.value?.name
+    );
+  });
 
   return {
     imageConfig,
@@ -352,7 +470,9 @@ const useHtmlEmbedding = () => {
     embedWeb,
     embedChatGPT,
     documentWeb,
-    listenAndAppendRequestPayload,
+    // listenAndAppendRequestPayload,
+    listenEnterKeyPress,
+    listenSendButtonClick,
   };
 };
 
