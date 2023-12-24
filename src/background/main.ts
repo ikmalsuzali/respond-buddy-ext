@@ -108,10 +108,17 @@ browser.tabs.onActivated.addListener(async ({ tabId }) => {
   }
 });
 
+let currentUrl = "";
+
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   console.log(changeInfo);
   previousTabId = tabId;
   if (changeInfo.url) {
+    console.log(
+      "🚀 ~ file: main.ts:117 ~ browser.tabs.onUpdated.addListener ~ changeInfo:",
+      changeInfo
+    );
+    currentUrl = changeInfo.url;
     sendMessage(
       "url-changed",
       { url: changeInfo.url },
@@ -120,7 +127,19 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         tabId: tabId,
       }
     );
+    sendMessage(
+      "url-changed-2",
+      { url: changeInfo.url },
+      {
+        context: "content-script",
+        tabId: tabId,
+      }
+    );
   }
+});
+
+browser.tabs.onCreated.addListener(async (tab) => {
+  previousTabId = tab.id;
 });
 
 browser.action.onClicked.addListener(async () => {});
@@ -921,6 +940,8 @@ onMessage("set-selected-prompt", (message: any) => {
     aiTemplate: message?.data?.aiTemplate,
   };
 
+  console.log("message", message);
+
   if (
     selectedPrompt.value.key &&
     previousSelectedPrompt.value?.key !== selectedPrompt.value.key
@@ -933,12 +954,17 @@ onMessage("set-selected-prompt", (message: any) => {
     .then(async (tabs) => {
       const currentTab = tabs[0];
 
-      let res = await sendMessage(
-        "set-selected-prompt",
+      await sendMessage(
+        "set-selected-prompt-1",
         { selectedPrompt: selectedPrompt.value },
         { context: "content-script", tabId: currentTab.id }
       );
-      console.log("🚀 ~ file: main.ts:928 ~ .then ~ res:", res);
+
+      await sendMessage(
+        "set-selected-prompt-2",
+        { selectedPrompt: selectedPrompt.value },
+        { context: "content-script", tabId: currentTab.id }
+      );
     });
 });
 
@@ -1011,4 +1037,15 @@ onMessage("set-template-writing-style", (message: any) => {
         { context: "content-script", tabId: currentTab.id! }
       );
     });
+});
+
+onMessage("get-current-url", async () => {
+  const tabs = await browser?.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+  console.log("🚀 ~ file: main.ts:1047 ~ onMessage ~ tabs:", tabs);
+  return tabs[0].url;
+
+  // console.log("🚀 ~ file: main.ts:1038 ~ onMessage ~ currentUrl:", currentUrl);
 });

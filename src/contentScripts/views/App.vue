@@ -11,7 +11,6 @@ import fileInfoSvg from "../../assets/file-info.svg";
 import languageSvg from "../../assets/language.svg";
 import messageQuestionSvg from "../../assets/message-question.svg";
 import oneTwoThreeSvg from "../../assets/onetwothree.svg";
-import useUrlWatcher from "../composables/useUrlWatcher";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -60,7 +59,6 @@ import HomeTabPanel from "./HomeTabPanel.vue";
 import useHtmlEmbeddings from "../composables/useHtmlEmbedding";
 import ButtonGroup from "./ButtonGroup.vue";
 
-const { url: currentUrl } = useUrlWatcher();
 const {
   embedWeb,
   documentWeb,
@@ -69,21 +67,64 @@ const {
   listenSendButtonClick,
 } = useHtmlEmbeddings();
 
-let prevUrl = ref("");
+// let prevUrl = ref("");
 
-watchEffect(() => {
-  // check if the url has changed
+// watch(
+//   currentUrl,
+//   () => {
+//     console.log("🚀 ~ file: App.vue:76 ~ currentUrl:", currentUrl);
 
-  if (currentUrl.value !== prevUrl.value) {
-    nextTick(() => {
-      setTimeout(() => {
-        embedWeb(currentUrl.value);
-        embedChatGPT();
-      }, 1000);
-    });
-    prevUrl.value = currentUrl.value;
-  }
+//     nextTick(() => {
+//       setTimeout(() => {
+//         embedWeb(currentUrl.value);
+//         embedChatGPT();
+//       }, 1000);
+//     });
+//     prevUrl.value = currentUrl.value;
+//   },
+//   { immediate: true }
+// );
+
+let currentUrl = ref("");
+
+const init = async () => {
+  currentUrl.value = window.location.href;
+  nextTick(() => {
+    setTimeout(() => {
+      embedWeb(currentUrl.value);
+      embedChatGPT();
+    }, 1000);
+  });
+};
+
+init();
+
+onMessage("url-changed", (message) => {
+  console.log("🚀 ~ file: App.vue:105 ~ onMessage ~ url changes:", message);
+  currentUrl.value = message?.data?.url;
+  nextTick(() => {
+    setTimeout(() => {
+      embedWeb(currentUrl.value);
+      embedChatGPT();
+    }, 1500);
+  });
 });
+
+// watchEffect(() => {
+//   // check if the url has changed
+
+//   if (currentUrl.value !== prevUrl.value) {
+//     console.log("🚀 ~ file: App.vue:78 ~ watchEffect ~ prevUrl:", prevUrl)
+//     console.log("🚀 ~ file: App.vue:78 ~ watchEffect ~ currentUrl:", currentUrl)
+//     nextTick(() => {
+//       setTimeout(() => {
+//         embedWeb(currentUrl.value);
+//         embedChatGPT();
+//       }, 1000);
+//     });
+//     prevUrl.value = currentUrl.value;
+//   }
+// });
 
 listenEnterKeyPress();
 listenSendButtonClick();

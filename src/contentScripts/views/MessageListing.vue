@@ -3,7 +3,21 @@
     <div class="flex-grow">
       <div class="w-[300px]">
         <div
-          v-if="selectedPrompt?.key"
+          v-if="showPromptListButton"
+          :key="componentRenderingCount"
+          class="inline-flex w-[170px] justify-center gap-x-1.5 rounded-lg bg-transparent px-2 py-2 text-sm text-slate-100 shadow-sm ring-1 ring-inset ring-gray-500 hover:bg-slate-700 cursor-pointer"
+        >
+          <div class="flex-grow px-1">
+            {{ "Prompt List" }}
+          </div>
+          <QueueListIcon
+            class="mr-1 h-5 w-5 text-gray-400 ml-auto"
+            aria-hidden="true"
+            @click.stop="onPromptListButtonClick"
+          />
+        </div>
+        <div
+          v-else-if="selectedPrompt?.key"
           class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-transparent px-2 py-2 text-sm text-slate-100 shadow-sm ring-1 ring-inset ring-gray-500 hover:bg-transparent"
         >
           <div class="flex-grow px-1">
@@ -24,7 +38,7 @@
             <Menu as="div" class="relative inline-block text-left">
               <div>
                 <MenuButton
-                  class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-transparent px-2 py-2 text-sm text-slate-100 shadow-sm ring-1 ring-inset ring-gray-500 hover:bg-transparent"
+                  class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-transparent px-2 py-2 text-sm text-slate-100 shadow-sm ring-1 ring-inset ring-gray-500 hover:bg-transparent hover:bg-slate-700 cursor-pointer"
                 >
                   {{ currentToneMenuItem?.name || "Tone" }}
                   <ChevronDownIcon
@@ -72,7 +86,7 @@
             <Menu as="div" class="relative inline-block text-left">
               <div>
                 <MenuButton
-                  class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-transparent px-2 py-2 text-sm text-slate-100 shadow-sm ring-1 ring-inset ring-gray-500 hover:bg-transparent"
+                  class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-transparent px-2 py-2 text-sm text-slate-100 shadow-sm ring-1 ring-inset ring-gray-500 hover:bg-transparent hover:bg-slate-700 cursor-pointer"
                 >
                   {{ currentWritingStyleMenuItem?.name || "Writing style" }}
                   <ChevronDownIcon
@@ -126,7 +140,7 @@
             <Menu as="div" class="relative inline-block text-left">
               <div>
                 <MenuButton
-                  class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-transparent px-2 py-2 text-sm text-slate-100 shadow-sm ring-1 ring-inset ring-gray-500 hover:bg-transparent"
+                  class="inline-flex w-full justify-center gap-x-1.5 rounded-lg bg-transparent px-2 py-2 text-sm text-slate-100 shadow-sm ring-1 ring-inset ring-gray-500 hover:bg-transparent hover:bg-slate-700 cursor-pointer"
                 >
                   {{ currentLanguageMenuItem?.name || "Language" }}
                   <ChevronDownIcon
@@ -188,12 +202,16 @@
 import { sendMessage, onMessage } from "webext-bridge/content-script";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
 import { XMarkIcon } from "@heroicons/vue/24/solid";
-import { ChevronDownIcon } from "@heroicons/vue/24/solid";
+import { ChevronDownIcon, QueueListIcon } from "@heroicons/vue/24/solid";
 
+const currentUrl = ref("");
+const componentRenderingCount = ref(0);
 const selectedPrompt = ref({
   key: null,
   name: null,
 });
+
+const showPromptListButton = ref(true);
 
 const toneMenuItems: any = ref([]);
 
@@ -246,25 +264,64 @@ const clearSelectedPrompt = async () => {
     name: null,
   };
 
-  await sendMessage("set-selected-prompt", { key: null, name: null });
+  await sendMessage("set-selected-prompt", {
+    key: null,
+    name: null,
+    aiTemplate: null,
+  });
 };
 
-onMessage("set-selected-prompt", (data) => {
-  console.log("🚀 ~ file: PromptListing.vue:447 ~ onMessage ~ data:", data);
+// Reason appending `2` to the event name is because the event name is already used in `useHtmlEmbedding.vue`
+onMessage("set-selected-prompt-2", (data) => {
+  console.log("🚀 ~ file: PromptListing.vue:448 ~ onMessage ~ data:", data);
   selectedPrompt.value = {
     key: data.data?.selectedPrompt?.key || null,
     name: data.data?.selectedPrompt?.name || null,
   };
 
   console.log(
-    "🚀 ~ file: MessageListing.vue:227 ~ onMessage ~ selectedPrompt:",
+    "🚀 ~ file: MessageListing.vue:228 ~ onMessage ~ selectedPrompt:",
     selectedPrompt
   );
 });
 
-onMounted(() => {
+onMounted(async () => {
   fetchTemplateLanguages();
   fetchTemplateTones();
   fetchTemplateWritingStyles();
+  componentRenderingCount.value += 1;
+  console.log(
+    "🚀 ~ file: MessageListing.vue:293 ~ setTimeout ~ componentRenderingCount:",
+    componentRenderingCount
+  );
+  const data = await sendMessage("get-current-url", null);
+  checkPromptListButton(data);
+
+  console.log("🚀 ~ file: MessageListing.vue:295 ~ setTimeout ~ data:", data);
 });
+
+const onPromptListButtonClick = async () => {
+  showPromptListButton.value = false;
+};
+
+// const fetchCurrentUrl = async () => {
+//   const data = await sendMessage("get-current-url", null);
+//   console.log(
+//     "🚀 ~ file: MessageListing.vue:300 ~ fetchCurrentUrl ~ data:",
+//     data
+//   );
+//   currentUrl.value = data || "";
+// };
+
+onMessage("url-changed-2", (message) => {
+  checkPromptListButton(message.data?.url);
+});
+
+const checkPromptListButton = (url: string) => {
+  if (url.includes("chat.openai.com/c/")) {
+    showPromptListButton.value = true;
+  } else {
+    showPromptListButton.value = false;
+  }
+};
 </script>

@@ -347,6 +347,12 @@ const useHtmlEmbedding = () => {
 
   const listenSendButtonClick = () => {
     document.addEventListener("mousedown", (event) => {
+      console.log(
+        "🚀 ~ file: useHtmlEmbedding.ts:360 ~ document.addEventListener ~ selectedPrompt:",
+        selectedPrompt.value
+      );
+
+      if (!selectedPrompt.value.aiTemplate) return;
       const sendButton = document.querySelector('[data-testid="send-button"]');
       if (!sendButton?.contains(event.target)) return;
       updateTextToPrompt();
@@ -355,7 +361,12 @@ const useHtmlEmbedding = () => {
 
   const listenEnterKeyPress = () => {
     document.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter") return;
+      console.log(
+        "🚀 ~ file: useHtmlEmbedding.ts:360 ~ document.addEventListener ~ selectedPrompt:",
+        selectedPrompt.value
+      );
+
+      if (event.key !== "Enter" || !selectedPrompt.value.aiTemplate) return;
 
       event.preventDefault();
       updateTextToPrompt();
@@ -368,7 +379,7 @@ const useHtmlEmbedding = () => {
 
     if (textArea) {
       textArea.value = generatePrompt(
-        "Using this topic [input], create a twitter post that will get a lot of engagement.",
+        selectedPrompt.value.aiTemplate,
         textArea.value
       );
       textArea.dispatchEvent(new Event("input", { bubbles: true }));
@@ -390,13 +401,13 @@ const useHtmlEmbedding = () => {
     prompt += `Please include, "Created by Respond Buddy - https://respondbuddy.com"`;
     prompt += `\n Please write in ${
       selectedTemplateTone.value.name
-        ? `${selectedTemplateTone.value.name} tone,`
+        ? `${selectedTemplateTone.value.name.toLowerCase()} tone,`
         : ""
     } ${
       selectedTemplateWritingStyle.value.name
-        ? `${selectedTemplateWritingStyle.value.name} writing style`
+        ? `${selectedTemplateWritingStyle.value.name.toLowerCase()} writing style`
         : ""
-    } written in ${selectedTemplateLanguage.value.name}.\n\n`;
+    } written in ${selectedTemplateLanguage.value.name || "English"}.\n\n`;
 
     return prompt;
   };
@@ -424,6 +435,24 @@ const useHtmlEmbedding = () => {
   const selectedTemplateTone = ref({
     name: "",
     key: "",
+  });
+
+  const selectedPrompt = ref({
+    name: "",
+    key: "",
+    ai_template: "",
+  });
+
+  onMessage("set-selected-prompt-1", (data) => {
+    console.log(
+      "🚀 ~ file: PromptListing.vue:447 ~ selectedPrompt ~ data:",
+      data.data.selectedPrompt
+    );
+    selectedPrompt.value = data.data.selectedPrompt;
+    console.log(
+      "🚀 ~ file: App.vue:106 ~ onMessage ~ selectedPrompt:",
+      selectedPrompt.value?.name
+    );
   });
 
   onMessage("set-template-tone", (data) => {

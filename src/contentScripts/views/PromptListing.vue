@@ -385,6 +385,10 @@ const onFilterCategoryItem = (item: any) => {
 };
 
 const onPromptClick = (prompt: any) => {
+  console.log(
+    "🚀 ~ file: PromptListing.vue:388 ~ onPromptClick ~ prompt:",
+    prompt
+  );
   selectedPrompt.value = {
     key: prompt.key,
     name: prompt.name,
