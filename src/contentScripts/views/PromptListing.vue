@@ -326,6 +326,7 @@ const promptsResponseData = ref({
 });
 
 const selectedPrompt = ref({
+  id: "",
   key: "",
   name: "",
   aiTemplate: "",
@@ -343,13 +344,8 @@ watch(promptsRequestData, async () => {
 });
 
 const fetchTemplates = async (templateData = {}) => {
-  console.log(
-    "🚀 ~ file: PromptListing.vue:304 ~ fetchTemplates ~ templateData:",
-    templateData
-  );
   isPromptsLoading.value = true;
   const data = await sendMessage("get-templates-api", templateData);
-  console.log("🚀 ~ file: App.vue:794 ~ fetchTemplates ~ data:", data);
 
   promptsResponseData.value = {
     prompts: data?.data || [],
@@ -385,20 +381,12 @@ const onFilterCategoryItem = (item: any) => {
 };
 
 const onPromptClick = (prompt: any) => {
-  console.log(
-    "🚀 ~ file: PromptListing.vue:388 ~ onPromptClick ~ prompt:",
-    prompt
-  );
   selectedPrompt.value = {
+    id: prompt.id,
     key: prompt.key,
     name: prompt.name,
     aiTemplate: prompt.ai_template,
   };
-
-  console.log(
-    "🚀 ~ file: PromptListing.vue:388 ~ onPromptClick ~ selectedPrompt:",
-    selectedPrompt
-  );
 
   sendMessage("set-selected-prompt", {
     ...selectedPrompt.value,

@@ -1,4 +1,3 @@
-import { send } from "vite";
 import { onMessage, sendMessage } from "webext-bridge/background";
 import type { Tabs } from "webextension-polyfill";
 import { generateUUID } from "~/logic/helper";
@@ -108,33 +107,32 @@ browser.tabs.onActivated.addListener(async ({ tabId }) => {
   }
 });
 
-let currentUrl = "";
+let currentUrl = ref("");
 
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  console.log(changeInfo);
   previousTabId = tabId;
   if (changeInfo.url) {
-    console.log(
-      "🚀 ~ file: main.ts:117 ~ browser.tabs.onUpdated.addListener ~ changeInfo:",
-      changeInfo
-    );
-    currentUrl = changeInfo.url;
-    sendMessage(
-      "url-changed",
-      { url: changeInfo.url },
-      {
-        context: "content-script",
-        tabId: tabId,
-      }
-    );
-    sendMessage(
-      "url-changed-2",
-      { url: changeInfo.url },
-      {
-        context: "content-script",
-        tabId: tabId,
-      }
-    );
+    currentUrl.value = changeInfo.url;
+    try {
+      sendMessage(
+        "url-changed",
+        { url: changeInfo.url },
+        {
+          context: "content-script",
+          tabId: tabId,
+        }
+      );
+      sendMessage(
+        "url-changed-2",
+        { url: changeInfo.url },
+        {
+          context: "content-script",
+          tabId: tabId,
+        }
+      );
+    } catch (error) {
+      console.error(error);
+    }
   }
 });
 
@@ -285,15 +283,10 @@ const fetchTagCategories = async (name: string = "") => {
     });
 
     let response = await data.json();
-    console.log(
-      "🚀 ~ file: main.ts:216 ~ fetchTagCategories ~ response:",
-      response
-    );
+    templateCategories.value = response.data || [];
 
     return response?.data || [];
   } catch (error) {
-    console.log("🚀 ~ file: main.ts:223 ~ fetchTagCategories ~ error:", error);
-
     return [];
   }
 };
@@ -316,15 +309,10 @@ const fetchTagWritingStyles = async (name: string = "") => {
     });
 
     let response = await data.json();
-    console.log(
-      "🚀 ~ file: main.ts:216 ~ fetchTagCategories ~ response:",
-      response
-    );
+    templateWritingStyles.value = response.data || [];
 
     return response?.data || [];
   } catch (error) {
-    console.log("🚀 ~ file: main.ts:223 ~ fetchTagCategories ~ error:", error);
-
     return [];
   }
 };
@@ -348,15 +336,10 @@ const fetchTagTones = async (name: string = "") => {
     });
 
     let response = await data.json();
-    console.log(
-      "🚀 ~ file: main.ts:216 ~ fetchTagCategories ~ response:",
-      response
-    );
+    templateTones.value = response.data || [];
 
     return response?.data || [];
   } catch (error) {
-    console.log("🚀 ~ file: main.ts:223 ~ fetchTagCategories ~ error:", error);
-
     return [];
   }
 };
@@ -380,15 +363,9 @@ const fetchTagLanguages = async (name: string = "") => {
     });
 
     let response = await data.json();
-    console.log(
-      "🚀 ~ file: main.ts:216 ~ fetchTagCategories ~ response:",
-      response
-    );
 
     return response?.data || [];
   } catch (error) {
-    console.log("🚀 ~ file: main.ts:223 ~ fetchTagCategories ~ error:", error);
-
     return [];
   }
 };
@@ -453,6 +430,31 @@ const fetchTags = async ({
     return data;
   } catch (error) {
     console.error("Failed to fetch tags:", error);
+    return null;
+  }
+};
+
+const updateTemplateCount = async (templateId: string) => {
+  try {
+    const baseURL = `${webUrl}/api/v1/tag/${templateId}/usage`;
+    const url = new URL(baseURL);
+
+    const response = await fetch(`${url}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token.value}`,
+      },
+    });
+
+    if (!response) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Failed to update template count:", error);
     return null;
   }
 };
@@ -894,31 +896,28 @@ onMessage("get-templates-api", async (message: any) => {
 });
 
 onMessage("fetch-template-categories-api", async (message: any) => {
-  // if (templateCategories.value.length > 0) return templateCategories.value;
+  if (templateCategories.value.length > 0) return templateCategories.value;
   const data = await fetchTagCategories(message?.data || "");
   templateCategories.value = data || [];
   return data;
 });
 
 onMessage("fetch-template-writing-styles", async (message: any) => {
-  // if (templateWritingStyles.value.length > 0)
-  //   return templateWritingStyles.value;
+  if (templateWritingStyles.value.length > 0)
+    return templateWritingStyles.value;
   const data = await fetchTagWritingStyles(message?.data || "");
-  templateWritingStyles.value = data || [];
   return data;
 });
 
 onMessage("fetch-template-languages", async (message: any) => {
-  // if (templateLanguages.value.length > 0) return templateLanguages.value;
+  if (templateLanguages.value.length > 0) return templateLanguages.value;
   const data = await fetchTagLanguages(message?.data || "");
-  templateLanguages.value = data || [];
   return data;
 });
 
 onMessage("fetch-template-tones", async (message: any) => {
-  // if (templateTones.value.length > 0) return templateTones.value;
+  if (templateTones.value.length > 0) return templateTones.value;
   const data = await fetchTagTones(message?.data || "");
-  templateTones.value = data || [];
   return data;
 });
 
@@ -935,12 +934,11 @@ const selectedPrompt = ref();
 const previousSelectedPrompt = ref();
 onMessage("set-selected-prompt", (message: any) => {
   selectedPrompt.value = {
+    id: message?.data?.id,
     key: message?.data?.key,
     name: message?.data?.name,
     aiTemplate: message?.data?.aiTemplate,
   };
-
-  console.log("message", message);
 
   if (
     selectedPrompt.value.key &&
@@ -974,7 +972,6 @@ onMessage("get-template-tone", () => {
 });
 
 onMessage("set-template-tone", (message: any) => {
-  console.log("🚀 ~ file: main.ts:943 ~ onMessage ~ message:", message);
   selectedTemplateTone.value = message?.data;
   selectedTemplateToneStorage.value = message?.data;
 
@@ -997,7 +994,6 @@ onMessage("get-template-language", () => {
 });
 
 onMessage("set-template-language", (message: any) => {
-  console.log("🚀 ~ file: main.ts:948 ~ onMessage ~ message:", message);
   selectedTemplateLanguage.value = message?.data;
   selectedTemplateLanguageStorage.value = message?.data;
 
@@ -1022,7 +1018,6 @@ onMessage("get-template-writing-style", () => {
 });
 
 onMessage("set-template-writing-style", (message: any) => {
-  console.log("🚀 ~ file: main.ts:953 ~ onMessage ~ message:", message);
   selectedTemplateWritingStyle.value = message?.data;
   selectedTemplateWritingStyleStorage.value = message?.data;
 
@@ -1044,8 +1039,11 @@ onMessage("get-current-url", async () => {
     active: true,
     currentWindow: true,
   });
-  console.log("🚀 ~ file: main.ts:1047 ~ onMessage ~ tabs:", tabs);
+  currentUrl.value = tabs[0].url || "";
   return tabs[0].url;
+});
 
-  // console.log("🚀 ~ file: main.ts:1038 ~ onMessage ~ currentUrl:", currentUrl);
+onMessage("update-template-count", async (message: any) => {
+  console.log("🚀 ~ file: main.ts:1047 ~ onMessage ~ message:", message);
+  await updateTemplateCount(message?.data?.id);
 });

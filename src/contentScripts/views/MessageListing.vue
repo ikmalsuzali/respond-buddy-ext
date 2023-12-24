@@ -6,14 +6,12 @@
           v-if="showPromptListButton"
           :key="componentRenderingCount"
           class="inline-flex w-[170px] justify-center gap-x-1.5 rounded-lg bg-transparent px-2 py-2 text-sm text-slate-100 shadow-sm ring-1 ring-inset ring-gray-500 hover:bg-slate-700 cursor-pointer"
+          @click.stop="onPromptListButtonClick"
         >
-          <div class="flex-grow px-1">
-            {{ "Prompt List" }}
-          </div>
+          <div class="flex-grow px-1">Prompt List</div>
           <QueueListIcon
             class="mr-1 h-5 w-5 text-gray-400 ml-auto"
             aria-hidden="true"
-            @click.stop="onPromptListButtonClick"
           />
         </div>
         <div
@@ -227,19 +225,16 @@ const currentLanguageMenuItem = ref({});
 
 const fetchTemplateLanguages = async (name: string = "") => {
   const data = await sendMessage("fetch-template-languages", name);
-  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
   languageMenuItems.value = data || [];
 };
 
 const fetchTemplateTones = async (name: string = "") => {
   const data = await sendMessage("fetch-template-tones", name);
-  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
   toneMenuItems.value = data || [];
 };
 
 const fetchTemplateWritingStyles = async (name: string = "") => {
   const data = await sendMessage("fetch-template-writing-styles", name);
-  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
   writingStyleMenuItems.value = data || [];
 };
 
@@ -265,6 +260,7 @@ const clearSelectedPrompt = async () => {
   };
 
   await sendMessage("set-selected-prompt", {
+    id: null,
     key: null,
     name: null,
     aiTemplate: null,
@@ -273,16 +269,11 @@ const clearSelectedPrompt = async () => {
 
 // Reason appending `2` to the event name is because the event name is already used in `useHtmlEmbedding.vue`
 onMessage("set-selected-prompt-2", (data) => {
-  console.log("🚀 ~ file: PromptListing.vue:448 ~ onMessage ~ data:", data);
   selectedPrompt.value = {
+    id: data.data?.selectedPrompt?.id || null,
     key: data.data?.selectedPrompt?.key || null,
     name: data.data?.selectedPrompt?.name || null,
   };
-
-  console.log(
-    "🚀 ~ file: MessageListing.vue:228 ~ onMessage ~ selectedPrompt:",
-    selectedPrompt
-  );
 });
 
 onMounted(async () => {
@@ -290,28 +281,14 @@ onMounted(async () => {
   fetchTemplateTones();
   fetchTemplateWritingStyles();
   componentRenderingCount.value += 1;
-  console.log(
-    "🚀 ~ file: MessageListing.vue:293 ~ setTimeout ~ componentRenderingCount:",
-    componentRenderingCount
-  );
+
   const data = await sendMessage("get-current-url", null);
   checkPromptListButton(data);
-
-  console.log("🚀 ~ file: MessageListing.vue:295 ~ setTimeout ~ data:", data);
 });
 
 const onPromptListButtonClick = async () => {
-  showPromptListButton.value = false;
+  window.location.replace("https://chat.openai.com/");
 };
-
-// const fetchCurrentUrl = async () => {
-//   const data = await sendMessage("get-current-url", null);
-//   console.log(
-//     "🚀 ~ file: MessageListing.vue:300 ~ fetchCurrentUrl ~ data:",
-//     data
-//   );
-//   currentUrl.value = data || "";
-// };
 
 onMessage("url-changed-2", (message) => {
   checkPromptListButton(message.data?.url);

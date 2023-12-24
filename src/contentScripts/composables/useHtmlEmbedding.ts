@@ -1,5 +1,4 @@
-import { onMessage } from "webext-bridge/content-script";
-import ButtonGroup from "../views/ButtonGroup.vue";
+import { onMessage, sendMessage } from "webext-bridge/content-script";
 import PromptListing from "../views/PromptListing.vue";
 import MessageListing from "../views/MessageListing.vue";
 
@@ -209,10 +208,6 @@ const useHtmlEmbedding = () => {
     // Loop through web config and check if the current url matches any of the matchUrlj
     // If it matches, then check if the selector exists on the page
     // If it exists, then append the style and actions to the selector
-    console.log(
-      "🚀 ~ file: useHtmlEmbedding.ts:34 ~ webConfig.value.forEach ~ currentUrl:",
-      currentUrl
-    );
     webConfig.value.forEach((config) => {
       if (
         currentUrl.includes(config.matchUrl) &&
@@ -220,10 +215,7 @@ const useHtmlEmbedding = () => {
       ) {
         prevUrl.value = currentUrl;
         const selectors = document.querySelectorAll(config.selector);
-        console.log(
-          "🚀 ~ file: useHtmlEmbedding.ts:39 ~ webConfig.value.forEach ~ selectors:",
-          selectors
-        );
+
         selectors.forEach((selector, index) => {
           if (config.single && index > 0) return;
           const container = document.createElement("div");
@@ -267,10 +259,6 @@ const useHtmlEmbedding = () => {
         });
       }
     });
-    console.log(
-      "🚀 ~ file: useHtmlEmbedding.ts:106 ~ webConfig.value.forEach ~ webConfig:",
-      webConfig
-    );
   };
 
   const embedImages = () => {
@@ -295,87 +283,80 @@ const useHtmlEmbedding = () => {
 
   onMessage("fetch-html-embedding-configs", (message) => {});
 
-  // const listenAndAppendRequestPayload = (
-  //   urlPattern: string,
-  //   contentToAppend: string
-  // ) => {
-  //   console.log(
-  //     "🚀 ~ file: useHtmlEmbedding.ts:292 ~ useHtmlEmbedding ~ urlPattern:",
-  //     urlPattern
-  //   );
-  //   window.addEventListener("fetch", async (event) => {
-  //     console.log(
-  //       "🚀 ~ file: useHtmlEmbedding.ts:297 ~ window.addEventListener ~ event:",
-  //       event
-  //     );
-  //     const request = event.request;
-  //     console.log(
-  //       "🚀 ~ file: index.ts:12 ~ window.addEventListener ~ request:",
-  //       request
-  //     );
-
-  //     // Check if the request URL matches the specified pattern
-  //     if (request.url.includes(urlPattern)) {
-  //       console.log(
-  //         "🚀 ~ file: index.ts:53 ~ window.addEventListener ~ request:",
-  //         request
-  //       );
-  //       try {
-  //         // Fetch the data
-  //         const response = await fetch(request);
-
-  //         // Modify the content to append
-  //         const modifiedContent = contentToAppend;
-  //         console.log(
-  //           "🚀 ~ file: index.ts:60 ~ window.addEventListener ~ contentToAppend:",
-  //           contentToAppend
-  //         );
-
-  //         // Append the modified content to the response
-  //         const updatedResponse = new Response(
-  //           new Blob([await response.text(), modifiedContent])
-  //         );
-
-  //         // Return the updated response
-  //         event.respondWith(updatedResponse);
-  //       } catch (error) {
-  //         console.error("Fetch failed:", error);
-  //       }
-  //     }
-  //   });
-  // };
-
   const listenSendButtonClick = () => {
     document.addEventListener("mousedown", (event) => {
-      console.log(
-        "🚀 ~ file: useHtmlEmbedding.ts:360 ~ document.addEventListener ~ selectedPrompt:",
-        selectedPrompt.value
-      );
-
       if (!selectedPrompt.value.aiTemplate) return;
       const sendButton = document.querySelector('[data-testid="send-button"]');
       if (!sendButton?.contains(event.target)) return;
       updateTextToPrompt();
+
+      sendMessage("update-template-count", {
+        id: selectedPrompt.value.id,
+      });
+      sendMessage(
+        "set-selected-prompt",
+        {
+          id: null,
+          key: null,
+          name: null,
+          aiTemplate: null,
+        },
+        "background"
+      );
     });
   };
 
   const listenEnterKeyPress = () => {
+    const promptTextArea = document.querySelector("#prompt-textarea");
+    const sendButton = document.querySelector('[data-testid="send-button"]');
+    promptTextArea?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && selectedPrompt.value.aiTemplate) {
+        event.preventDefault();
+        event.stopPropagation();
+        updateTextToPrompt();
+        sendButton?.click();
+
+        sendMessage("update-template-count", {
+          id: selectedPrompt.value.id,
+        });
+        sendMessage(
+          "set-selected-prompt",
+          {
+            id: null,
+            key: null,
+            name: null,
+            aiTemplate: null,
+          },
+          "background"
+        );
+      }
+
+      // event.preventDefault();
+      // event.stopPropagation();
+      // console.log(
+      //   "🚀 ~ file: useHtmlEmbedding.ts:324 ~ promptTextArea?.addEventListener ~ promptTextArea:",
+      //   promptTextArea
+      // );
+
+      if (event.key !== "Enter" || !selectedPrompt.value.aiTemplate) return;
+    });
+
     document.addEventListener("keydown", (event) => {
       console.log(
-        "🚀 ~ file: useHtmlEmbedding.ts:360 ~ document.addEventListener ~ selectedPrompt:",
-        selectedPrompt.value
+        "🚀 ~ file: useHtmlEmbedding.ts:315 ~ document.addEventListener ~ event:",
+        event
       );
-
       if (event.key !== "Enter" || !selectedPrompt.value.aiTemplate) return;
 
       event.preventDefault();
+      event.stopPropagation();
+
       updateTextToPrompt();
     });
   };
 
   const updateTextToPrompt = () => {
     const textArea = document.querySelector("#prompt-textarea");
-    console.log(textArea.value);
 
     if (textArea) {
       textArea.value = generatePrompt(
@@ -385,7 +366,6 @@ const useHtmlEmbedding = () => {
       textArea.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
-    console.log("send button clicked");
     return;
   };
 
@@ -438,58 +418,27 @@ const useHtmlEmbedding = () => {
   });
 
   const selectedPrompt = ref({
+    id: "",
     name: "",
     key: "",
     ai_template: "",
   });
 
   onMessage("set-selected-prompt-1", (data) => {
-    console.log(
-      "🚀 ~ file: PromptListing.vue:447 ~ selectedPrompt ~ data:",
-      data.data.selectedPrompt
-    );
     selectedPrompt.value = data.data.selectedPrompt;
-    console.log(
-      "🚀 ~ file: App.vue:106 ~ onMessage ~ selectedPrompt:",
-      selectedPrompt.value?.name
-    );
   });
 
   onMessage("set-template-tone", (data) => {
-    console.log(
-      "🚀 ~ file: PromptListing.vue:447 ~ selectedTemplateTone ~ data:",
-      data.data.selectedTemplateTone
-    );
     selectedTemplateTone.value = data.data.selectedTemplateTone;
-    console.log(
-      "🚀 ~ file: App.vue:106 ~ onMessage ~ selectedTemplateTone:",
-      selectedTemplateTone.value?.name
-    );
   });
 
   onMessage("set-template-writing-style", (data) => {
-    console.log(
-      "🚀 ~ file: PromptListing.vue:447 ~ selectedTemplateWritingStyle ~ data:",
-      data.data
-    );
     selectedTemplateWritingStyle.value =
       data.data?.selectedTemplateWritingStyle;
-    console.log(
-      "🚀 ~ file: App.vue:112 ~ onMessage ~ selectedTemplateWritingStyle:",
-      selectedTemplateWritingStyle.value?.name
-    );
   });
 
   onMessage("set-template-language", (data) => {
-    console.log(
-      "🚀 ~ file: PromptListing.vue:447 ~ selectedTemplateLanguage3 ~ data:",
-      data
-    );
     selectedTemplateLanguage.value = data.data?.selectedTemplateLanguage;
-    console.log(
-      "🚀 ~ file: App.vue:118 ~ onMessage ~ selectedTemplateLanguage:",
-      selectedTemplateLanguage.value?.name
-    );
   });
 
   return {

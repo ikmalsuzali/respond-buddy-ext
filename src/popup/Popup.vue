@@ -7,7 +7,7 @@ import { token, credits, newCreditDate, fontSize } from "~/logic/storage";
 // }
 
 const creditAmount = ref(credits.value);
-const creditResetAmount = 10;
+const creditResetAmount = 5;
 
 // const redirectIfNoAuth = () => {
 //   const webUrl = "https://app.respondbuddy.com/";
@@ -18,6 +18,11 @@ const creditResetAmount = 10;
 
 const onLoginClick = () => {
   const webUrl = "https://app.respondbuddy.com/login";
+  browser.tabs.create({ url: webUrl });
+};
+
+const onChatGPTClick = () => {
+  const webUrl = "https://chat.openai.com/";
   browser.tabs.create({ url: webUrl });
 };
 
@@ -123,6 +128,20 @@ scheduleDailyReset(creditResetAmount);
         @click="onRegisterClick"
       >
         Register
+      </button>
+    </div>
+    <div class="flex">
+      <button
+        type="button"
+        class="flex flex-col w-full items-center justify-center text-white focus:ring-4 focus:outline-none bg-gradient-to-br from-pink-400 to-blue-800 focus:ring-green-200 font-medium rounded-lg text-xs px-5 py-2.5 dark:hover:bg-[#050708]/40 dark:focus:ring-gray-600 mr-2 mb-2"
+        @click="onChatGPTClick"
+      >
+        <div class="flex items-center justify-center">Go to OpenAI Chat</div>
+        <div style="font-size: 10px" class="font-light mt-1">
+          🚀 Try our prompts for free! 🚀
+        </div>
+
+        <!-- <img src="~/assets/message-question.svg" class="w-4 h-4 ml-2" /> -->
       </button>
     </div>
     <div class="flex">

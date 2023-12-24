@@ -6,10 +6,6 @@ const useUrlWatcher = () => {
   const url = ref(window.location.href);
 
   onMessage("url-changed", (message) => {
-    console.log(
-      "🚀 ~ file: useUrlWatcher.ts:15 ~ onMessage ~ message:",
-      message
-    );
     url.value = message?.data?.url;
   });
 

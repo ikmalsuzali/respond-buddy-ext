@@ -67,24 +67,6 @@ const {
   listenSendButtonClick,
 } = useHtmlEmbeddings();
 
-// let prevUrl = ref("");
-
-// watch(
-//   currentUrl,
-//   () => {
-//     console.log("🚀 ~ file: App.vue:76 ~ currentUrl:", currentUrl);
-
-//     nextTick(() => {
-//       setTimeout(() => {
-//         embedWeb(currentUrl.value);
-//         embedChatGPT();
-//       }, 1000);
-//     });
-//     prevUrl.value = currentUrl.value;
-//   },
-//   { immediate: true }
-// );
-
 let currentUrl = ref("");
 
 const init = async () => {
@@ -100,7 +82,6 @@ const init = async () => {
 init();
 
 onMessage("url-changed", (message) => {
-  console.log("🚀 ~ file: App.vue:105 ~ onMessage ~ url changes:", message);
   currentUrl.value = message?.data?.url;
   nextTick(() => {
     setTimeout(() => {
@@ -110,142 +91,12 @@ onMessage("url-changed", (message) => {
   });
 });
 
-// watchEffect(() => {
-//   // check if the url has changed
-
-//   if (currentUrl.value !== prevUrl.value) {
-//     console.log("🚀 ~ file: App.vue:78 ~ watchEffect ~ prevUrl:", prevUrl)
-//     console.log("🚀 ~ file: App.vue:78 ~ watchEffect ~ currentUrl:", currentUrl)
-//     nextTick(() => {
-//       setTimeout(() => {
-//         embedWeb(currentUrl.value);
-//         embedChatGPT();
-//       }, 1000);
-//     });
-//     prevUrl.value = currentUrl.value;
-//   }
-// });
-
 listenEnterKeyPress();
 listenSendButtonClick();
-
-// document.addEventListener("mousedown", async (event) => {
-//   console.log("🚀 ~ file: App.vue:91 ~ event:", event);
-//   const sendButton = document.querySelector('[data-testid="send-button"]');
-//   if (!sendButton?.contains(event.target)) return;
-
-//   await triggerSendButton(event);
-// });
-
-// document.addEventListener("keydown", async (event) => {
-//   console.log("🚀 ~ file: App.vue:91 ~ event:", event);
-//   if (event.key === "Enter") {
-//     await triggerSendButton(event);
-//   }
-// });
-
-// const triggerSendButton = async (event) => {
-//   console.log("🚀 ~ file: App.vue:91 ~ event:", event);
-
-//   const textArea = document.querySelector("#prompt-textarea");
-//   console.log(textArea.value);
-
-//   if (textArea) {
-//     console.log(
-//       "🚀 ~ file: App.vue:101 ~ sendButton.addEventListener ~ textArea:",
-//       textArea
-//     );
-
-//     const templateTone = await sendMessage(
-//       "get-template-tone",
-//       null,
-//       "background"
-//     );
-
-//     console.log(
-//       "🚀 ~ file: App.vue:104 ~ document.addEventListener ~ templateTone:",
-//       templateTone
-//     );
-
-//     const templateLanguage = await sendMessage(
-//       "get-template-language",
-//       null,
-//       "background"
-//     );
-
-//     console.log(
-//       "🚀 ~ file: App.vue:112 ~ document.addEventListener ~ templateLanguage:",
-//       templateLanguage
-//     );
-
-//     const templateWritingStyle = await sendMessage(
-//       "get-template-writing-style",
-//       null,
-//       "background"
-//     );
-
-//     console.log(
-//       "🚀 ~ file: App.vue:120 ~ document.addEventListener ~ templateWritingStyle:",
-//       templateWritingStyle
-//     );
-
-//     textArea.value = generatePrompt(
-//       "Using this topic [input], create a twitter post that will get a lot of engagement.",
-//       textArea.value,
-//       templateTone.name,
-//       templateWritingStyle.name,
-//       templateLanguage.name
-//     );
-//     textArea.dispatchEvent(new Event("input", { bubbles: true }));
-//   }
-
-//   console.log("send button clicked");
-//   return;
-// };
-
-// const generatePrompt = (
-//   promptTemplate: string,
-//   promptValue: string,
-//   tone: string,
-//   writingStyle: string,
-//   language: string = "English"
-// ) => {
-//   if (!promptTemplate && promptValue) return promptValue;
-//   let prompt = "";
-//   prompt += `${
-//     promptTemplate.includes("[input]")
-//       ? replaceInputWithValue(promptTemplate, promptValue)
-//       : promptTemplate
-//   }\n`;
-//   prompt += `Below is the parameters to build this response prompt:\n`;
-//   prompt += `Please include, "Created by Respond Buddy - https://respondbuddy.com"`;
-//   prompt += `\n Please write in ${tone ? `${tone} tone,` : ""} ${
-//     writingStyle ? `${writingStyle} writing style` : ""
-//   } written in ${language}.\n\n`;
-
-//   return prompt;
-// };
-
-// const replaceInputWithValue = (
-//   inputString: string | null,
-//   replacementValue: string
-// ) => {
-//   if (!inputString) return "";
-//   const pattern = /\[input\]/g;
-//   const replacedString = inputString.replace(pattern, replacementValue);
-//   return replacedString || "";
-// };
-
-// const nativeFetch = window.fetch;
-// window.fetch = async (...args) => {
-//   console.log("detected fetch call");
-//   return nativeFetch.apply(window, args);
-// };
 
 const promptRoute = ref("listing");
 
 const onAskMeAnythingClick = () => {
-  console.log("onAskMeAnythingClick");
   selectedTab.value = 2;
   nextTick(() => {
     messageInput.value.focus();
@@ -733,11 +584,6 @@ const onClickToolbarItem = async (index: any) => {
       name: toolbarItems.value[index]?.name,
     };
 
-    console.log(
-      "🚀 ~ file: App.vue:519 ~ nextTick ~ selectedPrompt.value :",
-      selectedPrompt.value
-    );
-
     sendMessageRequestData.value.message = selectedText.value;
     messageInput.value.focus();
     adjustHeight();
@@ -792,7 +638,8 @@ let socialMediaShareMessage = ref([
 ]);
 
 // watch sendMessageRequestData.value.message
-watch(sendMessageRequestData.value.message, () => {
+watch(sendMessageRequestData.value, () => {
+  if (!sendMessageRequestData.value.message) return;
   adjustHeight();
 });
 
@@ -821,13 +668,9 @@ const onPreviousPageClick = () => {
 };
 
 const adjustHeight = () => {
-  console.log("adjustHeight");
   nextTick(() => {
     const textarea = messageInput.value;
-    console.log(
-      "🚀 ~ file: App.vue:562 ~ nextTick ~ messageInput:",
-      messageInput
-    );
+
     textarea.style.height = "auto";
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`; // Limit to 100px or five lines
   });
@@ -886,10 +729,6 @@ onMessage("toggle-chat", (_) => {
   toggle(true);
 });
 
-// onMessage("url-changed", (message) => {
-//   console.log("🚀 ~ file: app.ts:15 ~ onMessage ~ message:", message);
-// });
-
 onMessage("app-message", (message) => {
   // promptRoute.value = "";
   selectedTab.value = 2;
@@ -933,8 +772,6 @@ const onSendClick = async () => {
     return;
   }
 
-  console.log("send message", sendMessageRequestData.value);
-
   let response = await sendMessage(
     "ask-chat",
     {
@@ -963,9 +800,7 @@ const onSendClick = async () => {
 };
 
 const handleOutsideClick = (event) => {
-  console.log("handle outside click");
   if (!selectedText.value || selectedText.value === "") {
-    console.log('handle outside click, selectedText.value === "');
     isSelectionShow.value = false;
   }
 
@@ -1011,7 +846,6 @@ const updatePromptRoute = (route: string) => {
 const fetchTemplates = async (templateData = {}) => {
   isPromptsLoading.value = true;
   const data = await sendMessage("get-templates-api", templateData);
-  console.log("🚀 ~ file: App.vue:794 ~ fetchTemplates ~ data:", data);
 
   promptsData.value = {
     prompts: data?.data || [],
@@ -1028,7 +862,6 @@ const promptCategoriesData = ref([]);
 
 const fetchTemplateCategories = async (name: string = "") => {
   const data = await sendMessage("fetch-template-categories-api", name);
-  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data: categories", data);
   promptCategoriesData.value = data || [];
 };
 
@@ -1036,7 +869,6 @@ const promptLanguagesData = ref([]);
 
 const fetchTemplateLanguages = async (name: string = "") => {
   const data = await sendMessage("fetch-template-languages", name);
-  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
   promptLanguagesData.value = data || [];
 };
 
@@ -1044,7 +876,6 @@ const promptTonesData = ref([]);
 
 const fetchTemplateTones = async (name: string = "") => {
   const data = await sendMessage("fetch-template-tones", name);
-  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
   promptTonesData.value = data || [];
 };
 
@@ -1052,7 +883,6 @@ const promptWritingStylesData = ref([]);
 
 const fetchTemplateWritingStyles = async (name: string = "") => {
   const data = await sendMessage("fetch-template-writing-styles", name);
-  console.log("🚀 ~ file: App.vue:749 ~ watch ~ data:", data);
   promptWritingStylesData.value = data || [];
 };
 
@@ -1074,7 +904,6 @@ const dragMove = (e) => {
 };
 
 const onCancelCreatePromptClick = () => {
-  console.log("onCancelCreatePromptClick");
   promptRoute.value = "listing";
   createPromptRequestData.value = {
     name: "",
@@ -1168,13 +997,7 @@ const onCreatePromptClick = async () => {
     i++;
   }
 
-  console.log(createPromptError.value);
-
   if (hasError.value === true) {
-    console.log(
-      "🚀 ~ file: App.vue:859 ~ onCreatePromptClick ~ hasError:",
-      hasError.value
-    );
     hasError.value = false;
     return;
   }
@@ -1185,8 +1008,6 @@ const onCreatePromptClick = async () => {
   );
 
   isCreatePromptLoading.value = false;
-
-  console.log(data);
 
   if (!data) return;
 
@@ -1298,8 +1119,6 @@ const getToken = () => {
 
 const getTemplates = () => {
   sendMessage("get-templates", {}, "background").then((response) => {
-    console.log(response);
-    // prompts.value = response
     let templates = response || [];
     if (templates?.length === 0) {
       return;
@@ -1317,8 +1136,6 @@ const getTemplates = () => {
         },
       };
     });
-
-    console.log(prompts.value);
   });
 };
 
@@ -1504,47 +1321,6 @@ onMounted(() => {
       }
     }
   });
-
-  // const promptTextarea = document.querySelector("#prompt-textarea");
-  // console.log("prompt text area", promptTextarea);
-  // const container = document.createElement("div");
-  // container.style.display = "flex";
-  // // promptTextarea.parentNode.insertBefore(container, promptTextarea);
-  // const app = createApp(Combobox);
-  // app.mount(container);
-  // const button1 = document.createElement("button");
-  // button1.textContent = "Button 1";
-  // const button2 = document.createElement("button");
-  // button2.textContent = "Button 2";
-  // const button3 = document.createElement("button");
-  // button3.textContent = "Button 3";
-  // container.appendChild(button1);
-  // container.appendChild(button2);
-  // container.appendChild(button3);
-  // promptTextarea.parentNode.insertBefore(container, promptTextarea);
-
-  // let configElement = document.querySelector("section");
-  // console.log(
-  //   "🚀 ~ file: App.vue:715 ~ onMounted ~ configElement:",
-  //   configElement
-  // );
-  // if (configElement) {
-  //   teleportTarget.value = document.createElement("div");
-  //   configElement.insertBefore(teleportTarget.value, configElement.firstChild);
-  // }
-
-  // document.addEventListener("DOMContentLoaded", () => {
-  //   // Use the configurable selector
-  //   console.log("DOMContentLoaded");
-  //   let configElement = document.querySelector("section");
-  //   console.log(configElement);
-  //   if (configElement) {
-  //     let currentUrl = window.location.href;
-  //     if (currentUrl.includes("medium.com/")) {
-  //       console.log(window.location.href);
-  //     }
-  //   }
-  // });
 });
 
 onBeforeUnmount(() => {
