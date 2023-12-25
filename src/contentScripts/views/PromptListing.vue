@@ -131,7 +131,7 @@
           class="w-full flex flex-wrap gap-4 justify-between"
         >
           <div
-            v-for="_ in 9"
+            v-for="_ in 30"
             class="min-w-[300px] max-w-[350px] mx-auto overflow-hidden rounded-lg shadow-lg animate-pulse bg-slate-300"
           >
             <div class="w-full p-4 md:p-4">
@@ -157,7 +157,7 @@
         </div>
         <div
           v-else
-          class="cursor-pointer flex-grow w-full min-w-[300px] max-w-[350px] h-[125px]"
+          class="cursor-pointer flex-grow w-full min-w-[300px] max-w-[350px] h-[150px]"
           v-for="prompt in promptsResponseData.prompts"
         >
           <!-- Prompt Card -->
@@ -173,9 +173,9 @@
               >
                 <div class="flex flex-col h-full justify-between">
                   <div>
-                    <h2 class="text-lg">{{ prompt?.name }}</h2>
+                    <h2 class="text-md line-clamp-2">{{ prompt?.name }}</h2>
                     <div
-                      class="text-sm font-light text-gray-400 space-x-2 line-clamp-3 leading-5"
+                      class="text-xs font-light text-gray-400 space-x-2 line-clamp-3 leading-5"
                     >
                       {{
                         prompt?.used_description ||
@@ -184,7 +184,7 @@
                     </div>
                   </div>
 
-                  <div class="flex text-sm font-light text-gray-400 space-x-2">
+                  <div class="flex text-xs font-light text-gray-400 space-x-2">
                     <p class="text-gray-200 font-semibold">
                       {{ prompt?.tag_categories?.name || "" }}
                     </p>
@@ -314,12 +314,12 @@ const promptsRequestData = ref({
   category: "",
   sort_by: "top_usage",
   page: 1,
-  limit: 10,
+  limit: 100,
 });
 
 const promptsResponseData = ref({
   prompts: [],
-  limit: 10,
+  limit: 100,
   page: 1,
   total: 0,
   totalPages: 2,
@@ -413,18 +413,16 @@ const getCurrentAmount = (page: number, limit: number) => {
 const onNextPageClick = () => {
   if (
     getCurrentAmount(
-      promptsRequestData.value.page,
-      promptsRequestData.value.limit
-    ) === promptsResponseData.value.total
+      promptsResponseData.value.page,
+      promptsResponseData.value.limit
+    ) >= promptsResponseData.value.total
   )
     return;
 
-  if (promptsRequestData.value.page < promptsResponseData.value.totalPages) {
-    promptsRequestData.value = {
-      ...promptsRequestData.value,
-      page: promptsRequestData.value.page + 1,
-    };
-  }
+  promptsRequestData.value = {
+    ...promptsRequestData.value,
+    page: promptsRequestData.value.page + 1,
+  };
 };
 
 const onPreviousPageClick = () => {

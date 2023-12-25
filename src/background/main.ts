@@ -18,8 +18,8 @@ import {
   selectedTemplateWritingStyle as selectedTemplateWritingStyleStorage,
 } from "~/logic/storage";
 
-// let webUrl = "https://api.respondbuddy.com";
-let webUrl = "http://0.0.0.0:8080";
+let webUrl = "https://api.respondbuddy.com";
+// let webUrl = "http://0.0.0.0:8080";
 
 // only on dev mode
 if (import.meta.hot) {
@@ -1044,6 +1044,5 @@ onMessage("get-current-url", async () => {
 });
 
 onMessage("update-template-count", async (message: any) => {
-  console.log("🚀 ~ file: main.ts:1047 ~ onMessage ~ message:", message);
   await updateTemplateCount(message?.data?.id);
 });

@@ -331,21 +331,10 @@ const useHtmlEmbedding = () => {
         );
       }
 
-      // event.preventDefault();
-      // event.stopPropagation();
-      // console.log(
-      //   "🚀 ~ file: useHtmlEmbedding.ts:324 ~ promptTextArea?.addEventListener ~ promptTextArea:",
-      //   promptTextArea
-      // );
-
       if (event.key !== "Enter" || !selectedPrompt.value.aiTemplate) return;
     });
 
     document.addEventListener("keydown", (event) => {
-      console.log(
-        "🚀 ~ file: useHtmlEmbedding.ts:315 ~ document.addEventListener ~ event:",
-        event
-      );
       if (event.key !== "Enter" || !selectedPrompt.value.aiTemplate) return;
 
       event.preventDefault();
