@@ -48,6 +48,7 @@
                     v-else
                     class="-mr-1 h-5 w-5 text-gray-400"
                     aria-hidden="true"
+                    @mousedown="setCurrentToneMenuItem({ key: '', name: '' })"
                     @click.stop="setCurrentToneMenuItem({ key: '', name: '' })"
                   />
                 </MenuButton>
@@ -73,7 +74,8 @@
                             : 'text-gray-700',
                           'block px-4 py-2 text-sm',
                         ]"
-                        @click="setCurrentToneMenuItem(item)"
+                        @mousedown="setCurrentToneMenuItem(item)"
+                        @click.stop="setCurrentToneMenuItem(item)"
                         >{{ item.name }}</a
                       >
                     </MenuItem>
@@ -96,6 +98,9 @@
                     v-else
                     class="-mr-1 h-5 w-5 text-gray-400"
                     aria-hidden="true"
+                    @mousedown="
+                      setCurrentWritingStyleMenuItem({ key: '', name: '' })
+                    "
                     @click.stop="
                       setCurrentWritingStyleMenuItem({ key: '', name: '' })
                     "
@@ -127,6 +132,7 @@
                             : 'text-gray-700',
                           'block px-4 py-2 text-sm',
                         ]"
+                        @mousedown="setCurrentWritingStyleMenuItem(item)"
                         @click="setCurrentWritingStyleMenuItem(item)"
                         >{{ item.name }}</a
                       >
@@ -150,6 +156,9 @@
                     v-else
                     class="-mr-1 h-5 w-5 text-gray-400"
                     aria-hidden="true"
+                    @mousedown.stop="
+                      setCurrentLanguageMenuItem({ key: '', name: '' })
+                    "
                     @click.stop="
                       setCurrentLanguageMenuItem({ key: '', name: '' })
                     "
@@ -181,7 +190,8 @@
                             : 'text-gray-700',
                           'block px-4 py-2 text-sm',
                         ]"
-                        @click="setCurrentLanguageMenuItem(item)"
+                        @mousedown.stop="setCurrentLanguageMenuItem(item)"
+                        @click.stop="setCurrentLanguageMenuItem(item)"
                         >{{ item.name }}</a
                       >
                     </MenuItem>
@@ -202,7 +212,6 @@ import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
 import { XMarkIcon } from "@heroicons/vue/24/solid";
 import { ChevronDownIcon, QueueListIcon } from "@heroicons/vue/24/solid";
 
-const currentUrl = ref("");
 const componentRenderingCount = ref(0);
 const selectedPrompt = ref({
   key: null,
@@ -240,16 +249,28 @@ const fetchTemplateWritingStyles = async (name: string = "") => {
 
 const setCurrentToneMenuItem = async (item: any) => {
   currentToneMenuItem.value = item;
+  console.log(
+    "🚀 ~ file: MessageListing.vue:243 ~ setCurrentToneMenuItem ~ currentToneMenuItem:",
+    currentToneMenuItem
+  );
   await sendMessage("set-template-tone", item);
 };
 
 const setCurrentWritingStyleMenuItem = async (item: any) => {
   currentWritingStyleMenuItem.value = item;
+  console.log(
+    "🚀 ~ file: MessageListing.vue:248 ~ setCurrentWritingStyleMenuItem ~ currentWritingStyleMenuItem:",
+    currentWritingStyleMenuItem
+  );
   await sendMessage("set-template-writing-style", item);
 };
 
 const setCurrentLanguageMenuItem = async (item: any) => {
   currentLanguageMenuItem.value = item;
+  console.log(
+    "🚀 ~ file: MessageListing.vue:253 ~ setCurrentLanguageMenuItem ~ currentLanguageMenuItem:",
+    currentLanguageMenuItem
+  );
   await sendMessage("set-template-language", item);
 };
 

@@ -291,6 +291,7 @@ const useHtmlEmbedding = () => {
       updateTextToPrompt();
 
       sendMessage("update-template-count", {
+        key: selectedPrompt.value.key,
         id: selectedPrompt.value.id,
       });
       sendMessage(
@@ -317,6 +318,7 @@ const useHtmlEmbedding = () => {
         sendButton?.click();
 
         sendMessage("update-template-count", {
+          key: selectedPrompt.value.key,
           id: selectedPrompt.value.id,
         });
         sendMessage(
@@ -362,8 +364,12 @@ const useHtmlEmbedding = () => {
     if (!promptTemplate && promptValue) return promptValue;
     let prompt = "";
     prompt += `${
-      promptTemplate.includes("[input]")
-        ? replaceInputWithValue(promptTemplate, promptValue)
+      promptTemplate.includes("[input]") ||
+      promptTemplate.includes("[language]")
+        ? replacePatterns(promptTemplate, {
+            "\\[input\\]": promptValue,
+            "\\[language\\]": selectedTemplateLanguage.value.name,
+          })
         : promptTemplate
     }\n`;
     prompt += `Below is the parameters to build this response prompt:\n`;
@@ -388,6 +394,22 @@ const useHtmlEmbedding = () => {
     if (!inputString) return "";
     const pattern = /\[input\]/g;
     const replacedString = inputString.replace(pattern, replacementValue);
+    return replacedString || "";
+  };
+
+  const replacePatterns = (
+    inputString: string | null,
+    replacements: ReplacementObject
+  ) => {
+    if (!inputString) return "";
+    let replacedString = inputString;
+    for (const patternString in replacements) {
+      const pattern = new RegExp(patternString, "g");
+      replacedString = replacedString.replace(
+        pattern,
+        replacements[patternString]
+      );
+    }
     return replacedString || "";
   };
 

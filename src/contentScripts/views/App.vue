@@ -744,6 +744,7 @@ onMessage("app-message", (message) => {
       message.data?.appMessages?.messages[0];
   } else {
     messageData.value.push(message.data?.appMessages);
+    sendMessageRequestData.value.message = "";
   }
 
   isLoading.value = message.data?.appMessages?.loading;
@@ -831,6 +832,7 @@ watchEffect(() => {
 watch(debouncedPromptQuery, async () => {
   promptsRequestData.value = {
     ...promptsRequestData.value,
+    page: 1,
     search: debouncedPromptQuery.value,
   };
 });
@@ -1510,6 +1512,9 @@ onBeforeUnmount(() => {
                                         : 'text-gray-700',
                                       'block px-4 py-2 text-sm',
                                     ]"
+                                    @mousedown.stop="
+                                      onSortByMenuItemClick(item)
+                                    "
                                     @click="onSortByMenuItemClick(item)"
                                     >{{ item.name }}</a
                                   >
@@ -1533,6 +1538,9 @@ onBeforeUnmount(() => {
                                 v-else
                                 class="-mr-1 h-5 w-5 text-gray-400"
                                 aria-hidden="true"
+                                @mousedown="
+                                  onFilterCategoryItem(categoryItems[0])
+                                "
                                 @click.stop="
                                   onFilterCategoryItem(categoryItems[0])
                                 "
@@ -1564,6 +1572,7 @@ onBeforeUnmount(() => {
                                         : 'text-gray-700',
                                       'block px-4 py-2 text-sm',
                                     ]"
+                                    @mousedown="onFilterCategoryItem(item)"
                                     @click="onFilterCategoryItem(item)"
                                     >{{ item.name }}</a
                                   >
@@ -2294,7 +2303,7 @@ onBeforeUnmount(() => {
                           padding: 10px;
                         "
                         class="chat-group d-flex align-start"
-                        :class="msgGrp.senderId ? 'bg-white' : 'bg-blue-100'"
+                        :class="msgGrp.senderId ? 'bg-white' : 'bg-slate-50'"
                       >
                         <div
                           v-for="(msgData, msgIndex) in msgGrp.messages"
@@ -2308,7 +2317,7 @@ onBeforeUnmount(() => {
                           :style="`font-size: ${settings.fontSize}px`"
                         >
                           <pre
-                            class="formatted-text my-0"
+                            class="formatted-text leading-6 my-0"
                             :style="`font-size: ${settings.fontSize}px; `"
                             v-html="formattedText(msgData?.message)"
                           ></pre>
@@ -2404,7 +2413,7 @@ onBeforeUnmount(() => {
                           id="message-input"
                           rows="2"
                           name="description"
-                          class="outline-none bg-gray-50 block px-2 pt-1 w-full resize-none border-0 py-0 text-gray-900 placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6 mb-[-2px]"
+                          class="outline-none selection:text-blue-700 bg-gray-50 block px-2 pt-1 w-full resize-none border-0 py-0 text-gray-900 placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6 mb-[-2px]"
                           :class="isLoading ? 'cursor-wait' : ''"
                           :placeholder="
                             !isLoading ? 'Ask a question...' : 'Loading...'

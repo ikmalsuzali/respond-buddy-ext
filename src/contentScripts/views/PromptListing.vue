@@ -3,13 +3,24 @@
     class="flex-grow flex overflow-y-auto w-11/12"
     style="height: calc(100vh - 150px)"
   >
-    <div class="mt-12 pb-20 px-6 space-y-3 overflow-y-auto w-full">
+    <div class="mt-12 pb-16 px-6 space-y-3 overflow-y-auto w-full">
       <div>
-        <div class="flex my-4">
+        <div class="flex">
           <div class="font-bold text-xl w-full text-center">
             RespondBuddy Prompts
           </div>
         </div>
+        <div class="w-full text-center">
+          <div>Share with friends</div>
+          <button
+            v-for="social in socialMediaContents"
+            class="p-2 bg-transparent border-none hover:text-gray-300 cursor-pointer hover:shadow-lg hover:rounded active:scale-95 focus:outline-none"
+            @click="shareToSocialMedia(social.type)"
+          >
+            <img class="w-6 h-6" :src="social.icon" />
+          </button>
+        </div>
+
         <div>
           <div class="flex gap-2 place-content-center">
             <input
@@ -61,7 +72,8 @@
                             : 'text-gray-700',
                           'block px-4 py-2 text-sm',
                         ]"
-                        @click="onSortByMenuItemClick(item)"
+                        @mousedown="onSortByMenuItemClick(item)"
+                        @click.stop="onSortByMenuItemClick(item)"
                         >{{ item?.name }}</a
                       >
                     </MenuItem>
@@ -84,6 +96,7 @@
                     v-else
                     class="-mr-1 h-5 w-5 text-gray-400"
                     aria-hidden="true"
+                    @mousedown.stop="onFilterCategoryItem(categoryItems[0])"
                     @click.stop="onFilterCategoryItem(categoryItems[0])"
                   />
                 </MenuButton>
@@ -113,7 +126,8 @@
                             : 'text-gray-700',
                           'block px-4 py-2 text-sm',
                         ]"
-                        @click="onFilterCategoryItem(item)"
+                        @mousedown.stop="onFilterCategoryItem(item)"
+                        @click.stop="onFilterCategoryItem(item)"
                         >{{ item.name }}</a
                       >
                     </MenuItem>
@@ -272,6 +286,9 @@ import {
   HeartIcon as HeartOutlineIcon,
   ChartBarIcon,
 } from "@heroicons/vue/24/outline";
+import useShareSocial from "../composables/useShareSocial";
+
+const { socialMediaContents, shareToSocialMedia } = useShareSocial();
 
 const promptSearch = ref("");
 const isPromptsLoading = ref(true);
@@ -335,6 +352,7 @@ const selectedPrompt = ref({
 watch(debouncedPromptQuery, async () => {
   promptsRequestData.value = {
     ...promptsRequestData.value,
+    page: 1,
     search: debouncedPromptQuery.value,
   };
 });
@@ -411,6 +429,7 @@ const getCurrentAmount = (page: number, limit: number) => {
 };
 
 const onNextPageClick = () => {
+  if (isPromptsLoading.value) return;
   if (
     getCurrentAmount(
       promptsResponseData.value.page,
@@ -426,6 +445,8 @@ const onNextPageClick = () => {
 };
 
 const onPreviousPageClick = () => {
+  if (isPromptsLoading.value) return;
+
   if (promptsRequestData.value.page > 1) {
     promptsRequestData.value = {
       ...promptsRequestData.value,

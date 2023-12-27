@@ -434,9 +434,9 @@ const fetchTags = async ({
   }
 };
 
-const updateTemplateCount = async (templateId: string) => {
+const updateTemplateCount = async (templateKey: string) => {
   try {
-    const baseURL = `${webUrl}/api/v1/tag/${templateId}/usage`;
+    const baseURL = `${webUrl}/api/v1/tag/${templateKey}/usage`;
     const url = new URL(baseURL);
 
     const response = await fetch(`${url}`, {
@@ -445,13 +445,20 @@ const updateTemplateCount = async (templateId: string) => {
         "Content-Type": "application/json",
         authorization: `Bearer ${token.value}`,
       },
+      body: JSON.stringify({}),
     });
+
+    console.log(
+      "🚀 ~ file: main.ts:444 ~ updateTemplateCount ~ response:",
+      response
+    );
 
     if (!response) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log("🚀 ~ file: main.ts:460 ~ updateTemplateCount ~ data:", data);
     return data;
   } catch (error) {
     console.error("Failed to update template count:", error);
@@ -1044,5 +1051,6 @@ onMessage("get-current-url", async () => {
 });
 
 onMessage("update-template-count", async (message: any) => {
-  await updateTemplateCount(message?.data?.id);
+  console.log("🚀 ~ file: main.ts:1047 ~ onMessage ~ message:", message);
+  await updateTemplateCount(message?.data?.key);
 });
